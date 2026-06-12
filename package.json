@@ -1,0 +1,72 @@
+{
+  "name": "cracked-glass",
+  "version": "0.4.0",
+  "description": "Deterministic cracked/shattered glass effect for the web. Pure function of time: (t, seed, params) -> styles. No clocks, no Math.random, no WebGL.",
+  "keywords": [
+    "glass",
+    "cracked",
+    "shattered",
+    "broken-glass",
+    "effect",
+    "transition",
+    "deterministic",
+    "react",
+    "svg",
+    "animation"
+  ],
+  "author": "kossik <kossik@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kossik/cracked-glass.git"
+  },
+  "homepage": "https://github.com/kossik/cracked-glass#readme",
+  "bugs": {
+    "url": "https://github.com/kossik/cracked-glass/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm test && npm run build",
+    "test": "vitest run",
+    "dev": "vite",
+    "demo:build": "vite build",
+    "capture:check": "node tools/capture-check.mjs",
+    "capture:measure": "node tools/measure-capture.mjs"
+  },
+  "peerDependencies": {
+    "react": ">=17"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "playwright-core": "^1.49.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  }
+}

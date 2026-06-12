@@ -1,0 +1,96 @@
+import type { DeepPartial, EffectParams } from '../types';
+
+export const defaultEffectParams: EffectParams = {
+  quality: 'normal',
+  timeline: { crackStart: 0.05, crackEnd: 0.38, shatterStart: 0.48 },
+  refraction: { offsetPx: 6, rotateDeg: 0.9, scaleAmp: 0.016, tiltDeg: 1.6, perspectivePx: 800 },
+  optics: { brightnessAmp: 0.13, contrastAmp: 0.07, blurPx: 0.5, lightAngleDeg: -60, grainOpacity: 0.06 },
+  chroma: {
+    mode: 'shadow',
+    offsetPx: 2.6,
+    angleDeg: 14,
+    opacity: 0.5,
+    blendMode: 'screen',
+    colorA: 'rgba(255,42,84,0.55)',
+    colorB: 'rgba(0,212,255,0.55)',
+  },
+  facet: {
+    strength: 0.55,
+    tint: 'rgba(185,215,255,0.05)',
+    opacity: 0.55,
+    blendMode: 'overlay',
+  },
+  crackStyle: {
+    coreColor: 'rgba(255,255,255,0.92)',
+    coreWidth: 1.1,
+    shadowColor: 'rgba(0,0,0,0.5)',
+    shadowWidth: 2.4,
+    shadowOffsetPx: 1.4,
+    widthVariance: 0.6,
+    doubleEdge: 0.5,
+    subCracks: 0.6,
+    brightnessVar: 0.65,
+    hackleDensity: 0.55,
+    sparkle: true,
+    blendMode: 'multiply',
+  },
+  bevel: {
+    widthPx: 1.5,
+    intensity: 0.7,
+    glintStrength: 0.6,
+    lightColor: 'rgba(255,255,255,0.95)',
+    darkColor: 'rgba(8,12,18,0.75)',
+    blendMode: 'screen',
+    scatter: 0.65,
+  },
+  crush: { punch: true, scaleTo: 0.9 },
+  outliers: {
+    dropFraction: 0.05,
+    slipFraction: 0.09,
+    rebelFraction: 0.12,
+    slipPx: 10,
+    slipRotDeg: 2.5,
+  },
+  spectrum: {
+    count: 2,
+    opacity: 0.3,
+    bandWidth: 0.6,
+    blendMode: 'screen',
+  },
+  shatter: {
+    speed: 950,
+    gravity: [0, 1250],
+    drag: 1.6,
+    spinDegMax: 170,
+    tumbleDegMax: 70,
+    staggerPerRing: 0.035,
+    jitter: 0.4,
+    fadeOut: [0.86, 1],
+  },
+  motionBlur: { dt: 0.012, opacityFalloff: 0.5, speedThreshold: 140, smearPx: 14, smearBlurPx: 1.2 },
+  micro: { opacity: 0.85, speedScale: 1.5, fill: 'rgba(255,255,255,0.85)', fillAlt: 'rgba(20,26,34,0.6)' },
+  settle: { amplitudePx: 0, frequency: 2.2 },
+};
+
+/** Deep-merge user overrides over the defaults (arrays/tuples are replaced atomically). */
+export function normalizeEffectParams(fx?: DeepPartial<EffectParams>): EffectParams {
+  const d = defaultEffectParams;
+  if (!fx) return d;
+  return {
+    quality: (fx.quality as EffectParams['quality']) ?? d.quality,
+    timeline: { ...d.timeline, ...fx.timeline },
+    refraction: { ...d.refraction, ...fx.refraction },
+    optics: { ...d.optics, ...fx.optics },
+    chroma: { ...d.chroma, ...fx.chroma },
+    facet: { ...d.facet, ...fx.facet },
+    crackStyle: { ...d.crackStyle, ...fx.crackStyle },
+    bevel: { ...d.bevel, ...fx.bevel },
+    crush: { ...d.crush, ...fx.crush },
+    outliers: { ...d.outliers, ...fx.outliers },
+    spectrum: { ...d.spectrum, ...fx.spectrum },
+    shatter: { ...d.shatter, ...fx.shatter } as EffectParams['shatter'],
+    motionBlur: { ...d.motionBlur, ...fx.motionBlur },
+    micro: { ...d.micro, ...fx.micro },
+    settle: { ...d.settle, ...fx.settle },
+  };
+}
