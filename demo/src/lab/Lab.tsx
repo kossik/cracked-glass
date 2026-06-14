@@ -148,8 +148,10 @@ export function Lab(): ReactNode {
     computeFrame(state.t, pattern, fx);
     const dt = performance.now() - t0;
     const nodes = stageRef.current ? stageRef.current.querySelectorAll('*').length : 0;
+    const heavy = pattern.shards.length > 120 || nodes > 4000;
+    const warn = heavy ? `\n⚠ heavy (${pattern.shards.length} shards) — drop rays/rings, use draft, or feed an <img> snapshot` : '';
     setHud(
-      `computeFrame: ${dt.toFixed(2)} ms · DOM: ${nodes}\nshards: ${pattern.shards.length} · seed: ${pattern.seed} · mode: ${pattern.mode}`,
+      `computeFrame: ${dt.toFixed(2)} ms · DOM: ${nodes}\nshards: ${pattern.shards.length} · seed: ${pattern.seed} · mode: ${pattern.mode}${warn}`,
     );
   }, [state.t, pattern, fx]);
 

@@ -10,13 +10,14 @@ the same `t` must produce pixel-identical output.
 npm install cracked-glass
 ```
 
-Four fracture modes (`title` — broken headline, `radial` — impact web with a punched-out
-center, `collapse` — diagonal mesh crumbling out of its frame, `hero` — free shards levitating
-over content), two media (`content` — the content itself breaks; `glass` — a glass pane over
-anchored content, shards become moving lenses), two renderers (HTML clone tier for arbitrary
-content, single-`<svg>` premium tier for headlines with true per-channel chromatic
-decomposition), micro-debris, edge bevels with conchoidal light scatter, corner relief, outlier
-shards, edge-refraction rims and spectral flares — all driven by one `t` prop.
+Five fracture modes (`title` — broken headline, `radial` — impact transition with a punched-out
+center, `web` — thrown-object spider crack, `collapse` — diagonal mesh crumbling out of its
+frame, `hero` — free shards levitating over content), two media (`content` — the content itself
+breaks; `glass` — a glass pane over anchored content, shards become moving lenses), two renderers
+(HTML clone tier for arbitrary content, single-`<svg>` premium tier for headlines with true
+per-channel chromatic decomposition), micro-debris, edge bevels with conchoidal light scatter and
+per-sector shimmer, corner relief, outlier shards, edge-refraction rims and spectral flares — all
+driven by one `t` prop.
 
 ## Showcase
 
@@ -37,6 +38,11 @@ Diagonal mesh crumbling out of its frame (`mode: 'collapse'`):
 | cracked mesh with a spectral flare | bottom rows tear off | crumble |
 |---|---|---|
 | ![collapse mesh](docs/showcase/collapse-03.png) | ![collapse start](docs/showcase/collapse-05.png) | ![collapse fall](docs/showcase/collapse-068.png) |
+
+Thrown-object spider crack — rays from a hub joined by angular polygonal rings (`mode: 'web'`):
+
+| ![spider web](docs/showcase/web.png) |
+|---|
 
 SVG premium text tier — true `feColorMatrix` channel decomposition (`<CrackedGlassText/>`):
 
@@ -217,11 +223,12 @@ transition an `<img>` snapshot of the screen, or use `draft`.
   animating those params re-picks the carrier shards and pops DOM (animating `t` never does).
 - Under 'screen' blending the rainbow band is invisible over pure-white content (screen with
   white is white) - expected glass-flare physics; it reads in darker regions of the shard.
-- `FracturePattern.version` is 5: corner relief is on by default (a diagonal chord lops the
-  90-degree shard off each canvas corner), so partition patterns regenerate differently than
-  v4 for the same seed. Pass `corners: false` for the pre-relief geometry.
-- Jagged rim (a slightly oversized slab with a broken perimeter) is not in 0.5 — it needs an
-  enlarged render viewBox and generator-level shared-perimeter jagging; tracked for 0.6.
+- `FracturePattern.version` is 6: corner relief is on by default and the radial defaults are
+  lighter/asymmetric, so partition patterns regenerate differently than v4/v5 for the same seed.
+  Pass `corners: false` / `rings: { asymmetry: 0 }` for the older geometry.
+- Jagged rim (a slightly oversized slab with a broken perimeter) is still not shipped — two
+  validation rounds showed the outward-bleed + enlarged-viewBox form needs a generator-level
+  shared perimeter and a render-contract change across many consumers; tracked for 0.7.
 - `medium: 'glass'` is screen-space: each shard refracts only the underlying content; shards
   never see each other (no neighbor reflections, no compounded refraction where lenses overlap,
   no cast shadows). 3D rigid tumble is disabled in glass (a clipped wrapper flattens transforms).

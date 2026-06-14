@@ -138,7 +138,7 @@ export function shardMotion(
     dirX = Math.cos(a);
     dirY = Math.sin(a);
     speed = sh.speed * jitter(0.5);
-  } else if (pattern.mode === 'radial') {
+  } else if (pattern.mode === 'radial' || pattern.mode === 'web') {
     const dx = shard.centroid[0] - pattern.impact[0];
     const dy = shard.centroid[1] - pattern.impact[1];
     const d = Math.hypot(dx, dy) || 1;
@@ -212,7 +212,7 @@ export function microMotion(
   const sh = fx.shatter;
   let dirX: number;
   let dirY: number;
-  if (pattern.mode === 'radial') {
+  if (pattern.mode === 'radial' || pattern.mode === 'web') {
     const dx = origin[0] - pattern.impact[0];
     const dy = origin[1] - pattern.impact[1];
     const d = Math.hypot(dx, dy) || 1;

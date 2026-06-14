@@ -40,7 +40,7 @@ export function App() {
         height: 540,
         seed,
         impact: { x: 430, y: 250 },
-        rays: { count: 8 },
+        rays: { count: 6 },
         rings: { count: 3 },
       });
     }

@@ -75,7 +75,7 @@ const png3 = await page.locator('[data-stage]').screenshot();
 check('shuffle all changes pixels', !png2.equals(png3));
 
 // 6. scene switching works for every scene
-for (const scene of ['hero-2', 'macro-edge', 'radial', 'horizontal', 'diagonal']) {
+for (const scene of ['hero-2', 'macro-edge', 'radial', 'web', 'horizontal', 'diagonal']) {
   await page.locator('.sidebar select').first().selectOption(scene);
   await page.waitForTimeout(350);
   const visible = await page.locator('[data-stage]').isVisible();

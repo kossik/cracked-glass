@@ -22,8 +22,8 @@ export interface ParamDef {
 }
 
 const HERO: SceneId[] = ['hero-1', 'hero-2', 'macro-edge'];
-const PARTITION: SceneId[] = ['radial', 'horizontal', 'diagonal'];
-const ANIMATED: SceneId[] = ['radial', 'horizontal', 'diagonal'];
+const PARTITION: SceneId[] = ['radial', 'web', 'horizontal', 'diagonal'];
+const ANIMATED: SceneId[] = ['radial', 'web', 'horizontal', 'diagonal'];
 
 export const PARAM_DEFS: ParamDef[] = [
   // --- medium & lighting model ---
@@ -38,9 +38,14 @@ export const PARAM_DEFS: ParamDef[] = [
   { key: 'fr.hero.sizeFrac', label: 'shard size', group: 'Fracture', kind: 'range', min: 0.1, max: 0.48, step: 0.01, def: 0.34, scenes: HERO },
   { key: 'fr.hero.spread', label: 'spread', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.5, scenes: ['hero-2'] },
   { key: 'fr.hero.overlap', label: 'overlap', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.35, scenes: ['hero-2'] },
-  { key: 'fr.rays.count', label: 'rays', group: 'Fracture', kind: 'range', min: 4, max: 16, step: 1, def: 8, scenes: ['radial'] },
+  { key: 'fr.rays.count', label: 'rays', group: 'Fracture', kind: 'range', min: 4, max: 20, step: 1, def: 6, scenes: ['radial'] },
   { key: 'fr.rings.count', label: 'rings', group: 'Fracture', kind: 'range', min: 1, max: 7, step: 1, def: 4, scenes: ['radial'] },
-  { key: 'fr.rings.partial', label: 'partial rings', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.8, scenes: ['radial'] },
+  { key: 'fr.rings.partial', label: 'partial rings', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.88, scenes: ['radial'] },
+  { key: 'fr.rings.asymmetry', label: 'asymmetry', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.45, scenes: ['radial'] },
+  { key: 'fr.web.rays', label: 'rays', group: 'Fracture', kind: 'range', min: 3, max: 14, step: 1, def: 7, scenes: ['web'] },
+  { key: 'fr.web.rings', label: 'rings', group: 'Fracture', kind: 'range', min: 1, max: 7, step: 1, def: 4, scenes: ['web'] },
+  { key: 'fr.web.irregularity', label: 'irregularity', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.6, scenes: ['web'] },
+  { key: 'fr.rings.asymmetry', label: 'asymmetry', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.45, scenes: ['web'] },
   { key: 'fr.impactHole', label: 'impact hole', group: 'Fracture', kind: 'range', min: 0.3, max: 3, step: 0.05, def: 1, scenes: ['radial'] },
   { key: 'fr.bands.tilt', label: 'band tilt', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.6, scenes: ['horizontal'] },
   { key: 'fr.bands.splitters', label: 'splitters', group: 'Fracture', kind: 'range', min: 1, max: 3, step: 1, def: 3, scenes: ['horizontal'] },
@@ -81,6 +86,7 @@ export const PARAM_DEFS: ParamDef[] = [
   { key: 'fx.bevel.intensity', label: 'bevel intensity', group: 'Facet & Bevel', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.7 },
   { key: 'fx.bevel.glintStrength', label: 'glint', group: 'Facet & Bevel', kind: 'range', min: 0, max: 1.5, step: 0.05, def: 0.6 },
   { key: 'fx.bevel.scatter', label: 'scatter', group: 'Facet & Bevel', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.65 },
+  { key: 'fx.bevel.facetVariation', label: 'facet variation', group: 'Facet & Bevel', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.6 },
 
   // --- spectrum ---
   { key: 'fx.spectrum.count', label: 'shards', group: 'Spectrum', kind: 'range', min: 0, max: 3, step: 1, def: 2 },
@@ -95,6 +101,7 @@ export const PARAM_DEFS: ParamDef[] = [
   { key: 'fx.crackStyle.subCracks', label: 'sub cracks', group: 'Cracks', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.6, scenes: PARTITION },
   { key: 'fx.crackStyle.brightnessVar', label: 'brightness var', group: 'Cracks', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.65, scenes: PARTITION },
   { key: 'fx.crackStyle.hackleDensity', label: 'hackle density', group: 'Cracks', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.55, scenes: PARTITION },
+  { key: 'fx.crackStyle.growth', label: 'growth', group: 'Cracks', kind: 'select', options: ['snap', 'expo', 'quart'], def: 'snap', scenes: PARTITION },
 
   // --- outliers (partition scenes) ---
   { key: 'fx.outliers.dropFraction', label: 'dropped', group: 'Outliers', kind: 'range', min: 0, max: 0.3, step: 0.01, def: 0.05, scenes: PARTITION },

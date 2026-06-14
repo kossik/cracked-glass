@@ -2,7 +2,8 @@ import type { DeepPartial, EffectParams } from '../types';
 
 export const defaultEffectParams: EffectParams = {
   quality: 'normal',
-  timeline: { crackStart: 0.05, crackEnd: 0.38, shatterStart: 0.48 },
+  // glass cracks fast, holds (the money frame), then the pieces fall
+  timeline: { crackStart: 0.02, crackEnd: 0.2, shatterStart: 0.32 },
   medium: 'content',
   refraction: { offsetPx: 6, rotateDeg: 0.9, scaleAmp: 0.016, tiltDeg: 1.6, perspectivePx: 800 },
   optics: { brightnessAmp: 0.13, contrastAmp: 0.07, blurPx: 0.5, lightAngleDeg: -60, grainOpacity: 0.06, trackLight: false },
@@ -33,6 +34,7 @@ export const defaultEffectParams: EffectParams = {
     brightnessVar: 0.65,
     hackleDensity: 0.55,
     sparkle: true,
+    growth: 'snap',
     blendMode: 'multiply',
   },
   bevel: {
@@ -43,6 +45,7 @@ export const defaultEffectParams: EffectParams = {
     darkColor: 'rgba(8,12,18,0.75)',
     blendMode: 'screen',
     scatter: 0.65,
+    facetVariation: 0.6,
   },
   crush: { punch: true, scaleTo: 0.9 },
   outliers: {

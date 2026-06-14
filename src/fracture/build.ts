@@ -13,7 +13,7 @@ import { clamp } from '../core/math';
 
 /** Fully-resolved generation options (internal). */
 export interface ResolvedFracture {
-  mode: 'title' | 'radial' | 'collapse' | 'hero';
+  mode: 'title' | 'radial' | 'collapse' | 'hero' | 'web';
   width: number;
   height: number;
   seed: number;
@@ -35,7 +35,7 @@ export interface ResolvedFracture {
   impact: Vec2;
   impactHole: number;
   rays: { count: number; angleJitter: number; waviness: number; doubling: boolean; doublingStartRing: number };
-  rings: { count: number; spacing: 'uniform' | 'geometric'; jitter: number; partial: number };
+  rings: { count: number; spacing: 'uniform' | 'geometric'; jitter: number; partial: number; asymmetry: number };
   collapse: {
     angleA: number;
     angleB: number;
@@ -45,6 +45,7 @@ export interface ResolvedFracture {
     merge: number;
   };
   hero: { count: number; sizeFrac: number; spread: number; overlap: number };
+  web: { rays: number; rings: number; irregularity: number };
   corners: { relief: number } | false;
 }
 
@@ -92,17 +93,20 @@ export function resolveFractureOptions(opts: FractureOptions): ResolvedFracture 
       : [opts.width / 2, opts.height / 2],
     impactHole: clamp(opts.impactHole ?? 1, 0.3, 3),
     rays: {
-      count: Math.max(3, Math.round(opts.rays?.count ?? 8)),
+      // lower default ray count keeps the cell count (and thus per-shard DOM cost) sane;
+      // the lab lets you crank it higher when you want a denser web.
+      count: Math.max(3, Math.round(opts.rays?.count ?? 6)),
       angleJitter: clamp(opts.rays?.angleJitter ?? 0.6, 0, 1),
       waviness: clamp(opts.rays?.waviness ?? 0.5, 0, 1),
       doubling: opts.rays?.doubling ?? true,
-      doublingStartRing: Math.max(1, Math.round(opts.rays?.doublingStartRing ?? 2)),
+      doublingStartRing: Math.max(1, Math.round(opts.rays?.doublingStartRing ?? 3)),
     },
     rings: {
       count: Math.max(1, Math.round(opts.rings?.count ?? 4)),
       spacing: opts.rings?.spacing ?? 'geometric',
       jitter: clamp(opts.rings?.jitter ?? 0.5, 0, 1),
-      partial: clamp(opts.rings?.partial ?? 0.8, 0, 1),
+      partial: clamp(opts.rings?.partial ?? 0.88, 0, 1),
+      asymmetry: clamp(opts.rings?.asymmetry ?? 0.45, 0, 1),
     },
     collapse: {
       angleA,
@@ -117,6 +121,11 @@ export function resolveFractureOptions(opts: FractureOptions): ResolvedFracture 
       sizeFrac: clamp(opts.hero?.sizeFrac ?? 0.34, 0.05, 0.48),
       spread: clamp(opts.hero?.spread ?? 0.5, 0, 1),
       overlap: clamp(opts.hero?.overlap ?? 0, 0, 1),
+    },
+    web: {
+      rays: Math.max(3, Math.round(opts.web?.rays ?? 7)),
+      rings: Math.max(1, Math.round(opts.web?.rings ?? 4)),
+      irregularity: clamp(opts.web?.irregularity ?? 0.6, 0, 1),
     },
     corners:
       opts.corners === false ? false : { relief: clamp(opts.corners?.relief ?? 0.55, 0, 1) },

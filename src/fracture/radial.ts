@@ -59,12 +59,22 @@ export function generateRadialFracture(o: ResolvedFracture): {
    * runs must not cross it), the virtual outer ring. Coverage falls with distance from
    * the impact (photo reference: dense near the hole, sparse outside).
    */
+  // Directional asymmetry: a seeded "strong side" stays dense while the opposite "calm
+  // side" drops more arcs (bigger, fewer pieces). asymmetry 0 = the symmetric keep map.
+  const asym = o.rings.asymmetry;
+  const strongDir = rand01(seed, 'radial:strongDir') * TAU;
   const keepArc = (j: number, a: number): boolean => {
     if (j <= 0 || j >= M) return true;
     if (doubling && j === dS) return true;
     if (o.rings.partial <= 0) return true;
     const ramp = M >= 3 ? (j - 1) / (M - 2) : 1;
-    const keepProb = 1 - o.rings.partial * (0.1 + 0.45 * ramp);
+    let keepProb = 1 - o.rings.partial * (0.1 + 0.45 * ramp);
+    if (asym > 0) {
+      // angles[a] is the column's ray angle; side=1 on the strong axis, 0 opposite
+      const side = 0.5 + 0.5 * Math.cos(angles[a] - strongDir);
+      const dropScale = 1 + asym * 1.6 * (1 - side); // calm side drops arcs more often
+      keepProb = Math.max(0.02, 1 - (1 - keepProb) * dropScale);
+    }
     return rand01(seed, 'radial:arcKeep', j, a) < keepProb;
   };
 

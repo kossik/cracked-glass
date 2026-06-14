@@ -4,7 +4,7 @@
  * Demo-side code: free to use Math.random/rAF - the library itself never does.
  */
 
-export type SceneId = 'hero-1' | 'hero-2' | 'radial' | 'horizontal' | 'diagonal' | 'macro-edge';
+export type SceneId = 'hero-1' | 'hero-2' | 'radial' | 'web' | 'horizontal' | 'diagonal' | 'macro-edge';
 
 export type EasingId = 'linear' | 'inout' | 'impact';
 

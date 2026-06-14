@@ -18,7 +18,7 @@ interface StaticEntry {
    * threshold is an fx-INDEPENDENT constant - this cache is keyed by pattern only, so an
    * fx-driven split would silently serve stale sub-paths.
    */
-  bevel: Array<Array<{ dFull: string; dSpec: string; dShaded: string; angle: number }>>;
+  bevel: Array<Array<{ dFull: string; dSpec: string; dShaded: string; angle: number; intrinsic: number; jitter: number }>>;
 }
 
 /**
@@ -50,12 +50,21 @@ export function staticShardStrings(pattern: FracturePattern): StaticEntry {
 const BEVEL_SCATTER_KEY = hashString('bevelScatter');
 /** Fraction of edges classified "specular" (catching light regardless of orientation). */
 const BEVEL_SPEC_FRACTION = 0.3;
+const BEVEL_INTRINSIC_KEY = hashString('bevelIntrinsic');
+const BEVEL_JITTER_KEY = hashString('bevelJitter');
 
-function bevelSectors(
-  shard: Shard,
-  w: number,
-  h: number,
-): Array<{ dFull: string; dSpec: string; dShaded: string; angle: number }> {
+interface BevelSector {
+  dFull: string;
+  dSpec: string;
+  dShaded: string;
+  angle: number;
+  /** Static per-sector brightness (0.45..1) - a different break angle on each segment. */
+  intrinsic: number;
+  /** Static per-sector normal offset in radians (+-0.4) - peaks at a different rotation. */
+  jitter: number;
+}
+
+function bevelSectors(shard: Shard, w: number, h: number): BevelSector[] {
   const poly = shard.polygon;
   const n = poly.length / 2;
   const full = new Array<string>(BEVEL_SECTORS).fill('');
@@ -90,10 +99,17 @@ function bevelSectors(
       shaded[sector] += seg;
     }
   }
-  const out: Array<{ dFull: string; dSpec: string; dShaded: string; angle: number }> = [];
+  const out: BevelSector[] = [];
   for (let s = 0; s < BEVEL_SECTORS; s++) {
     if (full[s]) {
-      out.push({ dFull: full[s], dSpec: spec[s], dShaded: shaded[s], angle: ((s + 0.5) / BEVEL_SECTORS) * TAU });
+      out.push({
+        dFull: full[s],
+        dSpec: spec[s],
+        dShaded: shaded[s],
+        angle: ((s + 0.5) / BEVEL_SECTORS) * TAU,
+        intrinsic: 0.45 + 0.55 * hashTo01(hashCombine(shard.hash, BEVEL_INTRINSIC_KEY, s)),
+        jitter: (hashTo01(hashCombine(shard.hash, BEVEL_JITTER_KEY, s)) - 0.5) * 0.8,
+      });
     }
   }
   return out;
@@ -210,7 +226,7 @@ export function buildShardFrame(
     const slipSign = hashTo01(hashCombine(shard.hash, hashString('outlier:slipRot'))) < 0.5 ? -1 : 1;
     const slipJit = hashTo01(hashCombine(shard.hash, hashString('outlier:slipDir')));
     let dir: Vec2;
-    if (pattern.mode === 'radial') {
+    if (pattern.mode === 'radial' || pattern.mode === 'web') {
       // a piece sliding OUTWARD from the impact reads as fracture; downward would look wrong
       const dx = shard.centroid[0] - pattern.impact[0];
       const dy = shard.centroid[1] - pattern.impact[1];
@@ -454,18 +470,28 @@ export function buildShardFrame(
     const spinRad = degToRad(rigidRot);
     const glintBoost = flying ? 1 + fx.bevel.glintStrength * Math.min(1, tau * 3) : 1;
     const sigma = clamp01(fx.bevel.scatter);
+    // facetVariation: each sector breaks at a slightly different angle (jitter) and reflects
+    // with a different intrinsic brightness, so the edge stops reading as one uniform white
+    // line and shimmers per-sector as the shard turns. 0 = verbatim v0.5 (Lang===angle, im===1).
+    const fv = clamp01(fx.bevel.facetVariation);
+    // the intrinsic multiplier can push a sector's opacity into sub-1e-6 territory (which
+    // JSON renders in exponential notation); floor those to 0 - only on the fv>0 path, so
+    // the fv===0 byte anchor is untouched.
+    const fl = (x: number): number => (fv > 0 && x < 1e-6 ? 0 : x);
     for (const sec of statics.bevel[shardIndex]) {
-      const L = Math.cos(sec.angle + spinRad - lightRad);
+      const Lang = fv > 0 ? sec.angle + fv * sec.jitter : sec.angle;
+      const L = Math.cos(Lang + spinRad - lightRad);
+      const im = fv > 0 ? 1 - fv + fv * sec.intrinsic : 1;
       if (sigma <= 0) {
         const lit = L > 0;
         const mag = Math.min(1, Math.pow(Math.abs(L), 1.2) * fx.bevel.intensity * ease * opacity * glintBoost);
-        bevel.push({ d: sec.dFull, stroke: fx.bevel.lightColor, mixBlendMode: fx.bevel.blendMode, opacity: lit ? mag : 0 });
-        bevel.push({ d: sec.dFull, stroke: fx.bevel.darkColor, mixBlendMode: 'normal', opacity: lit ? 0 : Math.min(1, mag * 0.5) });
+        bevel.push({ d: sec.dFull, stroke: fx.bevel.lightColor, mixBlendMode: fx.bevel.blendMode, opacity: fl((lit ? mag : 0) * im) });
+        bevel.push({ d: sec.dFull, stroke: fx.bevel.darkColor, mixBlendMode: 'normal', opacity: fl((lit ? 0 : Math.min(1, mag * 0.5)) * im) });
         continue;
       }
       // glintBoost rides only the orientation-proportional terms so tumble glints stay
       // directional; the scatter floors do not flash uniformly.
-      const base = fx.bevel.intensity * ease * opacity;
+      const base = fx.bevel.intensity * ease * opacity * im;
       const gP = Math.pow(Math.max(0, L), 1.2) * glintBoost;
       const gM = Math.pow(Math.max(0, -L), 1.2) * glintBoost;
       const att = 1 - sigma;
@@ -474,15 +500,15 @@ export function buildShardFrame(
       if (sec.dSpec) {
         const litOp = Math.min(1, base * (gP + sigma * (0.35 + 0.65 * gP - gP)));
         const darkOp = Math.min(1, 0.5 * base * att * att * gM);
-        bevel.push({ d: sec.dSpec, stroke: fx.bevel.darkColor, mixBlendMode: 'normal', opacity: darkOp });
-        bevel.push({ d: sec.dSpec, stroke: fx.bevel.lightColor, mixBlendMode: fx.bevel.blendMode, opacity: litOp });
+        bevel.push({ d: sec.dSpec, stroke: fx.bevel.darkColor, mixBlendMode: 'normal', opacity: fl(darkOp) });
+        bevel.push({ d: sec.dSpec, stroke: fx.bevel.lightColor, mixBlendMode: fx.bevel.blendMode, opacity: fl(litOp) });
       }
       if (sec.dShaded) {
         const cross = 1 - 0.88 * sigma; // lerp(1, 0.12, sigma)
         const litOp = Math.min(1, base * gP * cross * cross);
         const darkOp = Math.min(1, 0.5 * base * (gM + sigma * (0.75 + 0.25 * gM - gM)));
-        bevel.push({ d: sec.dShaded, stroke: fx.bevel.darkColor, mixBlendMode: 'normal', opacity: darkOp });
-        bevel.push({ d: sec.dShaded, stroke: fx.bevel.lightColor, mixBlendMode: fx.bevel.blendMode, opacity: litOp });
+        bevel.push({ d: sec.dShaded, stroke: fx.bevel.darkColor, mixBlendMode: 'normal', opacity: fl(darkOp) });
+        bevel.push({ d: sec.dShaded, stroke: fx.bevel.lightColor, mixBlendMode: fx.bevel.blendMode, opacity: fl(litOp) });
       }
     }
   }

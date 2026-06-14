@@ -10,7 +10,7 @@
 
 export type Vec2 = readonly [number, number];
 
-export type FractureMode = 'title' | 'radial' | 'collapse' | 'hero';
+export type FractureMode = 'title' | 'radial' | 'collapse' | 'hero' | 'web';
 
 /** Options for generateFracture(). width/height/seed are mandatory: the library never measures the DOM. */
 export interface FractureOptions {
@@ -80,9 +80,30 @@ export interface FractureOptions {
     jitter?: number;
     /**
      * 0..1 ring incompleteness: real concentric cracks are PARTIAL arcs, never closed circles.
-     * Dropped arcs merge radially-adjacent cells (uneven fragment sizes). 0 = v0.3. Default 0.8.
+     * Dropped arcs merge radially-adjacent cells (uneven fragment sizes). 0 = v0.3. Default 0.88.
      */
     partial?: number;
+    /**
+     * 0..1 directional asymmetry: a real impact breaks one side harder than the other. A
+     * seeded "calm side" drops more ring arcs (bigger, fewer pieces there) while the opposite
+     * side stays dense. 0 = symmetric (pre-v0.6 keep map). Default 0.45.
+     */
+    asymmetry?: number;
+  };
+
+  /**
+   * mode 'web': a thrown-object spider crack - rays from a center joined by straight-ish
+   * polygonal rings (radius-bounded so cells never self-intersect), no punched hub and no
+   * ray-doubling. Distinct from 'radial' (an impact transition with a punched center and
+   * smooth arc rings). Irregularity comes from radius jitter, partial rings and asymmetry.
+   */
+  web?: {
+    /** Primary ray count. Default 7. */
+    rays?: number;
+    /** Concentric ring count. Default 4. */
+    rings?: number;
+    /** 0..1 extra radius jitter for uneven cells. Default 0.6. */
+    irregularity?: number;
   };
 
   /** mode 'collapse': two transversal families of wavy crack lines -> irregular quad mesh that crumbles. */
@@ -182,7 +203,7 @@ export interface MicroShardSeed {
 }
 
 export interface FracturePattern {
-  version: 5;
+  version: 6;
   mode: FractureMode;
   width: number;
   height: number;
@@ -338,6 +359,13 @@ export interface EffectParams {
     hackleDensity: number;
     /** Bright impact sparkle (radial mode). */
     sparkle: boolean;
+    /**
+     * Per-crack propagation curve over its own growth window: real cracks race to full
+     * length almost instantly, then hold (the "money frame") before the shards depart.
+     * 'snap' (default) reaches full length by ~40% of the window then holds; 'expo' is
+     * fast-but-eased; 'quart' is the gentle pre-v0.6 curve (byte anchor).
+     */
+    growth: 'snap' | 'expo' | 'quart';
     /** Blend mode of the dark shadow ribbon layer. */
     blendMode: BlendMode;
   };
@@ -358,6 +386,13 @@ export interface EffectParams {
      * 0 = v0.3 single-light law.
      */
     scatter: number;
+    /**
+     * 0..1 per-sector facet variation: each edge sector breaks at a slightly different angle
+     * and reflects with a different intrinsic brightness, so the bevel stops reading as one
+     * uniform white line and the sectors shimmer independently as the shard turns.
+     * 0 = uniform v0.5 law (byte anchor). Default 0.6.
+     */
+    facetVariation: number;
   };
   /** Behavior of the radial impact crush disc (geometry size lives in FractureOptions.impactHole). */
   crush: {

@@ -150,14 +150,43 @@ export const SCENES: SceneDef[] = [
           height: STAGE_H,
           seed,
           impact: { x: 430, y: 250 },
-          rays: { count: 8 },
+          rays: { count: 6 },
           rings: { count: 4 },
         } as unknown as Record<string, unknown>,
         fr,
       ) as unknown as FractureOptions,
     baseFx: () => ({
-      timeline: { crackStart: 0.02, crackEnd: 0.3, shatterStart: 0.38 },
-      shatter: { speed: 1550, gravity: [0, 420] as const, drag: 1.25, staggerPerRing: 0.045 },
+      // fast crack -> short hold -> the pieces blast a little and FALL (gravity-dominant)
+      timeline: { crackStart: 0, crackEnd: 0.16, shatterStart: 0.32 },
+      shatter: { speed: 700, gravity: [0, 1500] as const, drag: 1.0, staggerPerRing: 0.05 },
+      refraction: { offsetPx: 7 },
+      chroma: { mode: 'ghost', offsetPx: 3.4 },
+      facet: { strength: 0.5, opacity: 0.5 },
+      bevel: { intensity: 0.85, glintStrength: 0.9 },
+    }),
+    Render: TransitionScene,
+  },
+  {
+    id: 'web',
+    label: 'Web — spider crack',
+    defaultT: 0.4,
+    defaultZoom: 1,
+    makeOptions: (seed, fr) =>
+      deepMerge(
+        {
+          mode: 'web',
+          width: STAGE_W,
+          height: STAGE_H,
+          seed,
+          impact: { x: 470, y: 250 },
+          web: { rays: 7, rings: 4 },
+        } as unknown as Record<string, unknown>,
+        fr,
+      ) as unknown as FractureOptions,
+    baseFx: () => ({
+      // fast crack -> hold -> the web sheds and FALLS
+      timeline: { crackStart: 0, crackEnd: 0.16, shatterStart: 0.32 },
+      shatter: { speed: 500, gravity: [0, 1700] as const, drag: 0.9, staggerPerRing: 0.05 },
       refraction: { offsetPx: 7 },
       chroma: { mode: 'ghost', offsetPx: 3.4 },
       facet: { strength: 0.5, opacity: 0.5 },
@@ -198,7 +227,7 @@ export const SCENES: SceneDef[] = [
         fr,
       ) as unknown as FractureOptions,
     baseFx: () => ({
-      timeline: { crackStart: 0.02, crackEnd: 0.28, shatterStart: 0.34 },
+      timeline: { crackStart: 0, crackEnd: 0.16, shatterStart: 0.3 },
       shatter: { ...collapseShatterPreset, fadeOut: [0.92, 1] as [number, number] },
       bevel: { intensity: 0.75 },
     }),

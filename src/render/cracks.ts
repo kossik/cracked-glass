@@ -1,6 +1,6 @@
 import type { EffectParams, FracturePattern, FrameData, QualitySettings, Vec2 } from '../types';
 import type { PhaseInfo } from '../motion/timeline';
-import { clamp, clamp01, degToRad, easeOutCubic, easeOutQuart, fmt } from '../core/math';
+import { clamp, clamp01, degToRad, easeOutCubic, easeOutExpo, easeOutQuart, fmt } from '../core/math';
 import { hashCombine, hashString, hashTo01, rand01, rngFor } from '../core/prng';
 import { unflattenPts } from '../core/geometry';
 import { fbm1D } from '../core/noise';
@@ -19,6 +19,13 @@ export function crackLayer(
   q: QualitySettings,
 ): FrameData['cracks'] {
   const style = fx.crackStyle;
+  // Per-crack propagation curve. 'quart' is the verbatim pre-v0.6 ease (byte anchor);
+  // 'snap' races to full length by 40% of the window then holds (fast crack + money frame).
+  const growthVis = (local: number): number => {
+    if (style.growth === 'quart') return easeOutQuart(local);
+    if (style.growth === 'expo') return easeOutExpo(local);
+    return local >= 0.4 ? 1 : easeOutQuart(local / 0.4);
+  };
   const shAng = degToRad(fx.optics.lightAngleDeg + 180);
   const sox = Math.cos(shAng) * style.shadowOffsetPx;
   const soy = Math.sin(shAng) * style.shadowOffsetPx;
@@ -44,7 +51,7 @@ export function crackLayer(
       if (hashTo01(hashCombine(pattern.seed, hashString('stub:pick'), stubOrdinal)) >= style.subCracks) continue;
       const local = clamp01((info.crackProgress - crack.birth) / Math.max(1e-6, crack.growDuration));
       if (local <= 0) continue;
-      const vis = easeOutQuart(local) * crack.totalLen;
+      const vis = growthVis(local) * crack.totalLen;
       const part = partialPolylineWithS(unflattenPts(crack.points), crack.cumLen, vis);
       if (part.pts.length < 2) continue;
       const frame = miterFrame(part.pts);
@@ -62,7 +69,7 @@ export function crackLayer(
 
     const local = clamp01((info.crackProgress - crack.birth) / Math.max(1e-6, crack.growDuration));
     if (local <= 0) continue;
-    const vis = easeOutQuart(local) * crack.totalLen;
+    const vis = growthVis(local) * crack.totalLen;
     const all = unflattenPts(crack.points);
     const part = partialPolylineWithS(all, crack.cumLen, vis);
     if (part.pts.length < 2) continue;

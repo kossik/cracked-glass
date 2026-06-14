@@ -4,6 +4,7 @@ import { generateTitleFracture } from './title';
 import { generateRadialFracture } from './radial';
 import { generateCollapseFracture } from './collapse';
 import { generateHeroFracture } from './hero';
+import { generateWebFracture } from './web';
 import { applyCornerRelief } from './corners';
 import { addStubCracks, type StubJunction } from './stubs';
 import { seedMicroShards } from './micro';
@@ -36,6 +37,17 @@ export function generateFracture(opts: FractureOptions): FracturePattern {
     junctions = res.junctions;
     stubScale = res.stubScale;
     ringIndexAt = () => 0;
+  } else if (o.mode === 'web') {
+    const res = generateWebFracture(o);
+    shards = res.shards;
+    cracks = res.cracks;
+    junctions = res.junctions;
+    stubScale = res.stubScale;
+    const R = Math.hypot(Math.max(o.impact[0], o.width - o.impact[0]), Math.max(o.impact[1], o.height - o.impact[1]));
+    ringIndexAt = (origin) => {
+      const d = Math.hypot(origin[0] - o.impact[0], origin[1] - o.impact[1]);
+      return Math.max(0, Math.min(Math.round((d / Math.max(1, R)) * (res.maxRing + 1)), res.maxRing + 1));
+    };
   } else if (o.mode === 'collapse') {
     const res = generateCollapseFracture(o);
     shards = res.shards;
@@ -70,7 +82,7 @@ export function generateFracture(opts: FractureOptions): FracturePattern {
   const micro = seedMicroShards(o, cracks, ringIndexAt);
 
   const pattern: FracturePattern = {
-    version: 5,
+    version: 6,
     mode: o.mode,
     width: o.width,
     height: o.height,

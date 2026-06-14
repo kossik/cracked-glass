@@ -1,6 +1,6 @@
 {
   "name": "cracked-glass",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Deterministic cracked/shattered glass effect for the web. Pure function of time: (t, seed, params) -> styles. No clocks, no Math.random, no WebGL.",
   "keywords": [
     "glass",
