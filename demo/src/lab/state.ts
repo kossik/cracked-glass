@@ -34,7 +34,7 @@ export interface LabState {
 }
 
 export const defaultLabState: LabState = {
-  scene: 'hero-1',
+  scene: 'horizontal',
   seed: 7,
   t: 0.5,
   quality: 'normal',

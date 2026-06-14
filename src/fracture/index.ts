@@ -4,7 +4,7 @@ import { generateTitleFracture } from './title';
 import { generateRadialFracture } from './radial';
 import { generateCollapseFracture } from './collapse';
 import { generateHeroFracture } from './hero';
-import { generateWebFracture } from './web';
+import { generateWebFracture, webOrigin } from './web';
 import { applyCornerRelief } from './corners';
 import { addStubCracks, type StubJunction } from './stubs';
 import { seedMicroShards } from './micro';
@@ -43,10 +43,18 @@ export function generateFracture(opts: FractureOptions): FracturePattern {
     cracks = res.cracks;
     junctions = res.junctions;
     stubScale = res.stubScale;
-    const R = Math.hypot(Math.max(o.impact[0], o.width - o.impact[0]), Math.max(o.impact[1], o.height - o.impact[1]));
+    // stagger from the OFF-CANVAS fan origin: map the on-canvas distance span to ring index
+    const [Px, Py] = webOrigin(o.width, o.height, o.web.dir, o.web.distance);
+    let dMin = Infinity;
+    let dMax = 0;
+    for (const c of [[0, 0], [o.width, 0], [o.width, o.height], [0, o.height]] as Vec2[]) {
+      const d = Math.hypot(c[0] - Px, c[1] - Py);
+      if (d < dMin) dMin = d;
+      if (d > dMax) dMax = d;
+    }
     ringIndexAt = (origin) => {
-      const d = Math.hypot(origin[0] - o.impact[0], origin[1] - o.impact[1]);
-      return Math.max(0, Math.min(Math.round((d / Math.max(1, R)) * (res.maxRing + 1)), res.maxRing + 1));
+      const d = Math.hypot(origin[0] - Px, origin[1] - Py);
+      return Math.max(0, Math.min(Math.round(((d - dMin) / Math.max(1, dMax - dMin)) * (res.maxRing + 1)), res.maxRing + 1));
     };
   } else if (o.mode === 'collapse') {
     const res = generateCollapseFracture(o);
@@ -82,7 +90,7 @@ export function generateFracture(opts: FractureOptions): FracturePattern {
   const micro = seedMicroShards(o, cracks, ringIndexAt);
 
   const pattern: FracturePattern = {
-    version: 6,
+    version: 7,
     mode: o.mode,
     width: o.width,
     height: o.height,

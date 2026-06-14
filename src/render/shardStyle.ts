@@ -195,6 +195,14 @@ export function buildShardFrame(
       ? settleOffset(t, shard.hash, fx.settle.amplitudePx, fx.settle.frequency, 0)
       : { dx: 0, dy: 0, rot: 0 };
 
+  // --- title pre-fall spread: the pane drifts sideways (left half left, right half right)
+  //     while still holding, before the shatter. preSpreadPx 0 = no drift (byte anchor). ---
+  let preDx = 0;
+  if (info.phase === 'cracked' && pattern.mode === 'title' && fx.shatter.preSpreadPx > 0) {
+    const side = shard.centroid[0] < pattern.width / 2 ? -1 : 1;
+    preDx = side * fx.shatter.preSpreadPx * ease;
+  }
+
   // --- fade out late in the shatter ---
   let opacity = 1;
   if (info.phase === 'shattering') {
@@ -247,7 +255,7 @@ export function buildShardFrame(
     pattern.mode === 'hero' ? floatOffset(t, shard.hash, fx.float) : { dx: 0, dy: 0, rot: 0 };
 
   // --- rigid totals (mirrored into raw.rigid so both tiers stay in lockstep) ---
-  const rigidDx = fdx + st.dx + slipDx + fl.dx + gdir[0] * sinkPx;
+  const rigidDx = fdx + st.dx + slipDx + fl.dx + preDx + gdir[0] * sinkPx;
   const rigidDy = fdy + st.dy + slipDy + fl.dy + gdir[1] * sinkPx;
   const rigidRot = spin + st.rot + slipRot + fl.rot;
 

@@ -191,6 +191,9 @@ button.primary {
   height: 360px;
   display: grid;
   place-items: center;
+  /* the slab can be generated larger than this frame; the straight edge bleeds beyond it
+     and clips here, so the edge is hidden at rest and the edge pieces fly in on shatter */
+  overflow: hidden;
 }
 
 .title-content {

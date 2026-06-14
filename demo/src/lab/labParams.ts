@@ -42,8 +42,10 @@ export const PARAM_DEFS: ParamDef[] = [
   { key: 'fr.rings.count', label: 'rings', group: 'Fracture', kind: 'range', min: 1, max: 7, step: 1, def: 4, scenes: ['radial'] },
   { key: 'fr.rings.partial', label: 'partial rings', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.88, scenes: ['radial'] },
   { key: 'fr.rings.asymmetry', label: 'asymmetry', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.45, scenes: ['radial'] },
-  { key: 'fr.web.rays', label: 'rays', group: 'Fracture', kind: 'range', min: 3, max: 14, step: 1, def: 7, scenes: ['web'] },
+  { key: 'fr.web.rays', label: 'rays', group: 'Fracture', kind: 'range', min: 3, max: 14, step: 1, def: 9, scenes: ['web'] },
   { key: 'fr.web.rings', label: 'rings', group: 'Fracture', kind: 'range', min: 1, max: 7, step: 1, def: 4, scenes: ['web'] },
+  { key: 'fr.web.dir', label: 'fan dir', group: 'Fracture', kind: 'range', min: 0, max: 360, step: 1, def: 90, scenes: ['web'] },
+  { key: 'fr.web.distance', label: 'fan distance', group: 'Fracture', kind: 'range', min: 0.2, max: 6, step: 0.1, def: 1.2, scenes: ['web'] },
   { key: 'fr.web.irregularity', label: 'irregularity', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.6, scenes: ['web'] },
   { key: 'fr.rings.asymmetry', label: 'asymmetry', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.45, scenes: ['web'] },
   { key: 'fr.impactHole', label: 'impact hole', group: 'Fracture', kind: 'range', min: 0.3, max: 3, step: 0.05, def: 1, scenes: ['radial'] },
@@ -51,6 +53,7 @@ export const PARAM_DEFS: ParamDef[] = [
   { key: 'fr.bands.splitters', label: 'splitters', group: 'Fracture', kind: 'range', min: 1, max: 3, step: 1, def: 3, scenes: ['horizontal'] },
   { key: 'fr.bands.waviness', label: 'waviness', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.5, scenes: ['horizontal'] },
   { key: 'fr.bands.diagonalChance', label: 'diag chance', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.6, scenes: ['horizontal'] },
+  { key: 'fr.bands.diagonal', label: 'diagonal lean', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.7, scenes: ['horizontal'] },
   { key: 'fr.collapse.merge', label: 'merge', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.3, scenes: ['diagonal'] },
   { key: 'fr.collapse.waviness', label: 'waviness', group: 'Fracture', kind: 'range', min: 0, max: 1, step: 0.01, def: 0.5, scenes: ['diagonal'] },
   { key: 'fr.collapse.angleA', label: 'angle A', group: 'Fracture', kind: 'range', min: -10, max: 45, step: 1, def: 14, scenes: ['diagonal'] },
@@ -124,6 +127,8 @@ export const PARAM_DEFS: ParamDef[] = [
   { key: 'fx.shatter.spinDegMax', label: 'spin max', group: 'Shatter', kind: 'range', min: 0, max: 400, step: 5, def: 170, scenes: ANIMATED },
   { key: 'fx.shatter.tumbleDegMax', label: 'tumble max', group: 'Shatter', kind: 'range', min: 0, max: 120, step: 2, def: 70, scenes: ANIMATED },
   { key: 'fx.shatter.staggerPerRing', label: 'stagger', group: 'Shatter', kind: 'range', min: 0, max: 0.12, step: 0.002, def: 0.035, scenes: ANIMATED },
+  { key: 'fx.shatter.spread', label: 'spread (title)', group: 'Shatter', kind: 'select', options: ['fall', 'slide', 'apart'], def: 'fall', scenes: ['horizontal'] },
+  { key: 'fx.shatter.preSpreadPx', label: 'pre-spread px', group: 'Shatter', kind: 'range', min: 0, max: 30, step: 1, def: 0, scenes: ['horizontal'] },
 
   // --- settle & motion blur ---
   { key: 'fx.settle.amplitudePx', label: 'settle amp', group: 'Motion', kind: 'range', min: 0, max: 6, step: 0.1, def: 0, scenes: PARTITION },

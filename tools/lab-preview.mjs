@@ -25,7 +25,7 @@ const SCENES = [
   ['macro-edge', 0.5],
   ['radial', 0.45],
   ['web', 0.25],
-  ['horizontal', 0.5],
+  ['horizontal', 0.3],
   ['diagonal', 0.5],
 ];
 

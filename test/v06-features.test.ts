@@ -151,7 +151,7 @@ describe('spider-web mode (N2)', () => {
     const radial = generateFracture({ mode: 'radial', width: 960, height: 540, seed: 7 });
     expect(JSON.stringify(web.shards)).not.toBe(JSON.stringify(radial.shards));
     expect(web.mode).toBe('web');
-    expect(web.version).toBe(6);
+    expect(web.version).toBe(7);
   });
 
   it('emits ray and ring cracks, no crush', () => {

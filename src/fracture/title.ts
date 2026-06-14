@@ -133,18 +133,20 @@ export function generateTitleFracture(o: ResolvedFracture): {
       }
       const targetX = (0.3 + rngS() * 0.4) * w;
       const iT = nearestIndexByX(top, targetX, 2);
-      const lean = (rngS() * 2 - 1) * (0.35 + 0.9 * o.deviation) * gap;
+      const diag = o.bands.diagonal;
+      const lean = (rngS() * 2 - 1) * (diag > 0 ? diag * 0.6 * gap : (0.35 + 0.9 * o.deviation) * gap);
       const iB = nearestIndexByX(bot, top[iT][0] + lean, 2);
       const a = top[iT];
       const b = bot[iB];
       const splitBase: Vec2[] = [a, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], b];
-      const splitter = subdivideMidpoint(
+      let splitter = subdivideMidpoint(
         splitBase,
         o.edgeDetail,
         o.jaggedness * 0.45,
         hashCombine(seed, hashString('title:splitjag'), band),
         gap * 0.16,
       );
+      if (diag > 0) splitter = clampSplitterToBand(splitter, top, bot, gap);
       const left: Vec2[] = [...top.slice(0, iT + 1), ...splitter.slice(1), ...reversePts(bot.slice(0, iB))];
       const right: Vec2[] = [
         ...top.slice(iT),
@@ -173,6 +175,9 @@ export function generateTitleFracture(o: ResolvedFracture): {
     const probs = [q, 0.45 * q, 0.2 * q].slice(0, m);
     const slotLo = 0.15 * w;
     const slotW = (0.7 * w) / m;
+    const diag = o.bands.diagonal;
+    // all splitters in a band lean the SAME way -> iB advances with iT -> they never cross
+    const bandSign = rand01(seed, 'title:diagSign', band) < 0.5 ? -1 : 1;
     type Cand = { iT: number; iB: number; pts: Vec2[] };
     const cands: Cand[] = [];
     for (let j = 0; j < m; j++) {
@@ -181,18 +186,22 @@ export function generateTitleFracture(o: ResolvedFracture): {
       const r2 = rand01(seed, 'title:msplitL', band, j);
       const targetX = slotLo + slotW * j + (0.25 + 0.5 * r1) * slotW;
       const iT = nearestIndexByX(top, targetX, 2);
-      const lean = (r2 * 2 - 1) * Math.min((0.35 + 0.9 * o.deviation) * gap, 0.2 * slotW);
+      const lean =
+        diag > 0
+          ? bandSign * Math.min((0.35 + 0.65 * r2) * diag, 0.6) * gap
+          : (r2 * 2 - 1) * Math.min((0.35 + 0.9 * o.deviation) * gap, 0.2 * slotW);
       const iB = nearestIndexByX(bot, top[iT][0] + lean, 2);
       const a = top[iT];
       const b = bot[iB];
       const splitBase: Vec2[] = [a, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], b];
-      const pts = subdivideMidpoint(
+      let pts = subdivideMidpoint(
         splitBase,
         o.edgeDetail,
         o.jaggedness * 0.45,
         hashCombine(seed, hashString('title:msplitjag'), band, j),
         Math.min(gap * 0.16, 0.1 * slotW),
       );
+      if (diag > 0) pts = clampSplitterToBand(pts, top, bot, gap);
       cands.push({ iT, iB, pts });
     }
     // SIGNED index-gap enforcement on the RESOLVED stations (targets can snap): both
@@ -256,6 +265,36 @@ function boundaryBirthOrder(bandCount: number): number[] {
   const ks = Array.from({ length: bandCount - 1 }, (_, i) => i + 1);
   const mid = bandCount / 2;
   return ks.sort((p, q) => Math.abs(p - mid) - Math.abs(q - mid) || p - q);
+}
+
+/** Interpolated y of an x-sorted boundary polyline at x (clamped to its range). */
+function interpY(poly: Vec2[], x: number): number {
+  if (x <= poly[0][0]) return poly[0][1];
+  const last = poly[poly.length - 1];
+  if (x >= last[0]) return last[1];
+  for (let i = 0; i + 1 < poly.length; i++) {
+    if (x >= poly[i][0] && x <= poly[i + 1][0]) {
+      const t = (x - poly[i][0]) / Math.max(1e-9, poly[i + 1][0] - poly[i][0]);
+      return poly[i][1] + (poly[i + 1][1] - poly[i][1]) * t;
+    }
+  }
+  return last[1];
+}
+
+/**
+ * Keep a diagonal splitter strictly inside its band: clamp every INTERIOR point's y between
+ * the top and bottom boundaries at that point's x (the endpoints stay exact on the boundaries
+ * - they are shared vertices). Without this the jag of a steep splitter pokes across a
+ * boundary and the assembled shard self-intersects.
+ */
+function clampSplitterToBand(pts: Vec2[], top: Vec2[], bot: Vec2[], gap: number): Vec2[] {
+  const m = 0.05 * gap;
+  return pts.map((p, i) => {
+    if (i === 0 || i === pts.length - 1) return p;
+    const lo = interpY(top, p[0]) + m;
+    const hi = interpY(bot, p[0]) - m;
+    return [p[0], p[1] < lo ? lo : p[1] > hi ? hi : p[1]] as Vec2;
+  });
 }
 
 function nearestIndexByX(pts: Vec2[], x: number, margin: number): number {

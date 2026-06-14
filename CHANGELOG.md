@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.7.0
+
+A direction pass on the fracture geometry: the `web` mode becomes a diverging off-screen fan,
+corner relief becomes a real split cast *from* the corner, and the title bands gain diagonal
+splitters plus a choice of how the pane comes apart. `FracturePattern.version` is now **7**
+(the web/corner geometry and the new title splitter lean regenerate differently than v6).
+
+### Added
+
+- **`web.dir` / `web.distance`** — `mode: 'web'` is now a **diverging fan**: rays radiate from a
+  point placed OFF the canvas (`web.dir` degrees, `web.distance` in units of the larger side) and
+  fan ACROSS the frame — not a centered spider web, and not parallel. The cone and outer radius
+  are derived so the fan always covers the whole canvas (the origin is clamped off-screen and the
+  ring band is fit to the on-canvas strip, so even `rings: 1` tiles fully).
+- **`bands.diagonal`** (title, default 0.7) — band splitters lean diagonally across each band
+  (with and without a bend) instead of running near-vertical; each band leans one way so adjacent
+  splitters never cross. `bands.diagonal: 0` restores the v0.6 vertical splitters.
+- **`shatter.spread`** (`'fall'` default / `'slide'` / `'apart'`) — how a title pane comes apart:
+  `fall` drops straight down (the v0.6 behaviour), `slide` slides each half outward then falls,
+  `apart` splits the two halves toward the viewer's sides.
+- **`shatter.preSpreadPx`** (default 0) — once cracked but before the fall, the pane drifts
+  sideways by this many px (left half left, right half right), so the break reads before the drop.
+
+### Changed
+
+- **Corner relief is a real split FROM the corner** — instead of slicing a triangular ear off the
+  90° corner, 1–2 cracks are cast from the corner vertex to existing vertices on a non-adjacent
+  edge, splitting the corner piece into wedges (watertight, terminating only at shared vertices so
+  no T-junction tear). Applies to all modes; `corners: false` still leaves corners whole.
+- The lab defaults to the **horizontal** scene, with a baked glass preset, diagonal splitters,
+  `slide` shatter, and a slab generated larger than the (overflow-clipped) title block so the pane
+  edge starts beyond the frame and the edge pieces fly in on shatter. New `web` controls
+  (`fan dir` / `fan distance`) and a `diagonal lean` control.
+
+### Determinism
+
+Every new parameter keeps a zero/false anchor reproducing v0.6 byte-for-byte (`bands.diagonal: 0`,
+`shatter.spread: 'fall'` + `preSpreadPx: 0`, `corners: false`). The web fan, diagonal splitters and
+corner split each passed an adversarial validation before coding and a review after — the review
+caught a `rings: 1` coverage hole (a far origin let the outer ring boundary perturb below the
+canvas), now fixed by pinning the boundary rings and fitting the band to the on-canvas strip.
+
 ## 0.6.0
 
 A realism pass: a spider-web fracture mode, a less uniform and far cheaper radial, faster

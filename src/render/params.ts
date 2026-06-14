@@ -72,6 +72,8 @@ export const defaultEffectParams: EffectParams = {
     staggerPerRing: 0.035,
     jitter: 0.4,
     fadeOut: [0.86, 1],
+    spread: 'fall',
+    preSpreadPx: 0,
   },
   motionBlur: { dt: 0.012, opacityFalloff: 0.5, speedThreshold: 140, smearPx: 14, smearBlurPx: 1.2 },
   micro: { opacity: 0.85, speedScale: 1.5, fill: 'rgba(255,255,255,0.85)', fillAlt: 'rgba(20,26,34,0.6)' },

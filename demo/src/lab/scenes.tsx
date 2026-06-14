@@ -168,9 +168,11 @@ export const SCENES: SceneDef[] = [
   },
   {
     id: 'web',
-    label: 'Web — spider crack',
+    label: 'Web — diverging fan',
     defaultT: 0.4,
     defaultZoom: 1,
+    // Rays diverge from a point OFF the frame (web.dir/web.distance), fanning across the
+    // canvas - like a thrown object striking from outside, not a centered spider web.
     makeOptions: (seed, fr) =>
       deepMerge(
         {
@@ -178,8 +180,7 @@ export const SCENES: SceneDef[] = [
           width: STAGE_W,
           height: STAGE_H,
           seed,
-          impact: { x: 470, y: 250 },
-          web: { rays: 7, rings: 4 },
+          web: { rays: 9, rings: 4, dir: 90, distance: 1.2 },
         } as unknown as Record<string, unknown>,
         fr,
       ) as unknown as FractureOptions,
@@ -197,22 +198,40 @@ export const SCENES: SceneDef[] = [
   {
     id: 'horizontal',
     label: 'Horizontal — title bands',
-    defaultT: 0.5,
+    defaultT: 0.35,
     defaultZoom: 1,
+    // The slab is generated LARGER than the visible title-block (which is overflow:hidden),
+    // so the straight pane edge starts beyond the frame and the edge pieces fly in on shatter.
     makeOptions: (seed, fr) =>
       deepMerge(
         {
           mode: 'title',
-          width: 880,
-          height: 360,
+          width: 1000,
+          height: 400,
           seed,
-          bands: { count: [3, 5] },
+          jaggedness: 0.38,
+          edgeDetail: 3,
+          deviation: 0.88,
+          corners: { relief: 0.34 },
+          bands: { count: [3, 5], tilt: 0.78, splitters: 3, waviness: 0.68, diagonalChance: 0.66 },
         } as unknown as Record<string, unknown>,
         fr,
       ) as unknown as FractureOptions,
     baseFx: () => ({
-      timeline: { crackStart: 0.05, crackEnd: 0.4, shatterStart: 0.55 },
-      outliers: { dropFraction: 0.18, slipFraction: 0.25 },
+      medium: 'content',
+      timeline: { crackStart: 0.0, crackEnd: 0.2, shatterStart: 0.42 },
+      optics: { trackLight: true, lightAngleDeg: 67, brightnessAmp: 0.24, contrastAmp: 0.14, blurPx: 1.85 },
+      refraction: { offsetPx: 13.5, rotateDeg: 0.95, scaleAmp: 0.016, tiltDeg: 3.7 },
+      edgeDistortion: { strength: 0.85, widthPx: 8, blurPx: 1.05 },
+      chroma: { mode: 'shadow', offsetPx: 3.3, angleDeg: 130, opacity: 0.51 },
+      facet: { strength: 0.48, opacity: 0.43 },
+      bevel: { widthPx: 2.7, intensity: 0.4, glintStrength: 0.1, scatter: 0.24, facetVariation: 0.66 },
+      spectrum: { count: 1, opacity: 0.32, bandWidth: 0.95, edgeOnly: 1 },
+      crackStyle: { coreWidth: 1.05, widthVariance: 0.88, doubleEdge: 0.65, subCracks: 1, brightnessVar: 1, hackleDensity: 0 },
+      outliers: { dropFraction: 0.3, slipFraction: 0.37, rebelFraction: 0.4, slipPx: 14 },
+      shatter: { speed: 1900, drag: 0.9, spinDegMax: 0, tumbleDegMax: 120, staggerPerRing: 0.02, spread: 'slide', preSpreadPx: 10 },
+      settle: { amplitudePx: 3.3 },
+      motionBlur: { smearPx: 11, smearBlurPx: 3.3 },
     }),
     Render: TitleScene,
   },

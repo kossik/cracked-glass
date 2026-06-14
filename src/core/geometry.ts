@@ -21,6 +21,21 @@ export function ensurePositiveWinding(poly: Vec2[]): Vec2[] {
   return signedArea(poly) >= 0 ? poly : poly.slice().reverse();
 }
 
+/** Ray-cast point-in-polygon (boundary counts as outside is fine for interior tests). */
+export function pointInPolygon(p: Vec2, poly: Vec2[]): boolean {
+  let inside = false;
+  const n = poly.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const a = poly[i];
+    const b = poly[j];
+    if ((a[1] > p[1]) !== (b[1] > p[1])) {
+      const x = ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0];
+      if (p[0] < x) inside = !inside;
+    }
+  }
+  return inside;
+}
+
 export function polygonCentroid(poly: Vec2[]): Vec2 {
   let a = 0;
   let cx = 0;

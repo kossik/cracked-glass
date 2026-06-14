@@ -48,6 +48,9 @@ describe('title fracture invariants', () => {
       height: 400,
       seed: 11,
       bands: { count: 4, diagonalChance: 0 },
+      // isolate band-boundary watertightness from corner relief (which may split a corner
+      // shard down to a band boundary - watertight, but a band crack then borders >2 shards)
+      corners: false,
     });
     const key = (x: number, y: number) => `${x.toFixed(6)}:${y.toFixed(6)}`;
     const shardPointSets = p.shards.map((s) => {

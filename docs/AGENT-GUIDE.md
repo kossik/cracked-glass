@@ -20,11 +20,12 @@ carriers and DOM structure would re-select and pop.
 | Mood | Mode | Key levers |
 |---|---|---|
 | Impact, aggression, ad punch | `radial` | short crack phase (`{crackStart:0, crackEnd:0.16, shatterStart:0.32}`), `rings.asymmetry 0.6` (one side harder), then a gravity fall (`gravity [0,1500]`), `bevel.intensity 0.9`, `chroma.mode 'ghost'` |
-| Thrown-rock spider crack | `web` | the realistic single-impact look — `web.irregularity 0.7`, `crackStyle.growth 'snap'`, gravity-dominant shatter so the web sheds and falls |
+| Thrown-rock from off-screen | `web` | a diverging fan — set `web.dir` (degrees the impact comes from) and `web.distance` (how far off-screen), `web.irregularity 0.7`, `crackStyle.growth 'snap'`, gravity-dominant shatter so the fan sheds and falls |
 | Suspense, dread | `radial`/`title` | long crack phase (0→0.55), `shatterStart` late or `Infinity` — make the viewer wait; `crackStyle.brightnessVar 0.8`, `subCracks 0.9` keep the web alive |
 | Melancholy, loss | `collapse` | `collapseShatterPreset`, `staggerPerRing 0.07` — pieces tear off reluctantly, one by one; low side light (`lightAngleDeg 160`), spectrum off (`spectrum.count 0`) |
 | Glitch, techno, cyberpunk | any | `outliers {dropFraction:0.12, rebelFraction:0.25}`, `chroma.offsetPx 5-7`, `deviation 0.8` — a system with loud exceptions |
 | Poster, cover art | `title` + `staticCrackedTimeline` | `t` barely matters; character = seed casting + light + a single spectral flare |
+| Headline cracks then slides apart | `title` | `bands.diagonal 0.7` (splitters lean diagonally), `shatter.spread 'slide'` (each half slides out then falls) or `'apart'` (halves part toward the viewer), `shatter.preSpreadPx 8-12` for a pre-fall sideways drift; oversize the slab + host `overflow:hidden` so the pane edge starts off-frame and edge pieces fly in |
 
 ## Pacing: mapping scene time onto t
 

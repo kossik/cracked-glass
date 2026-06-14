@@ -53,6 +53,13 @@ export interface FractureOptions {
     tilt?: number;
     /** Max splitters per band (1..3). 1 = v0.3 single-splitter behavior. Default 3. */
     splitters?: number;
+    /**
+     * 0..1 how diagonal the band splitters run. 0 = the near-vertical pre-v0.7 splitters
+     * (byte anchor). >0 leans all splitters in a band the SAME way (so they stay parallel
+     * and never cross) up to ~0.6*gap, clamped to the band so the jag never pokes across a
+     * boundary. Default 0.7.
+     */
+    diagonal?: number;
   };
 
   /** mode 'radial': impact point in design-space px. Default: container center. */
@@ -98,12 +105,23 @@ export interface FractureOptions {
    * smooth arc rings). Irregularity comes from radius jitter, partial rings and asymmetry.
    */
   web?: {
-    /** Primary ray count. Default 7. */
+    /** Primary ray count. Default 9. */
     rays?: number;
     /** Concentric ring count. Default 4. */
     rings?: number;
     /** 0..1 extra radius jitter for uneven cells. Default 0.6. */
     irregularity?: number;
+    /**
+     * Direction the fan travels INTO the canvas, in degrees (0 = +x). The off-canvas origin
+     * sits opposite this, so the rays diverge from behind the frame across it. Default 90.
+     */
+    dir?: number;
+    /**
+     * How far off-canvas the fan origin sits, as a fraction of max(w,h). Larger = more
+     * parallel (less divergent) rays. The angular spread is derived to cover the whole
+     * canvas. Default 1.2.
+     */
+    distance?: number;
   };
 
   /** mode 'collapse': two transversal families of wavy crack lines -> irregular quad mesh that crumbles. */
@@ -203,7 +221,7 @@ export interface MicroShardSeed {
 }
 
 export interface FracturePattern {
-  version: 6;
+  version: 7;
   mode: FractureMode;
   width: number;
   height: number;
@@ -456,6 +474,18 @@ export interface EffectParams {
     jitter: number;
     /** Absolute-t window over which flying shards fade out (only applies during shatter). */
     fadeOut: [number, number];
+    /**
+     * mode 'title': how the slabs leave. 'fall' = drop with a random drift (v0.6).
+     * 'slide' = each piece slides out to its own side (left half left, right half right)
+     * then gravity pulls it down (a parabola). 'apart' = the halves blast apart sideways
+     * toward the viewer with little vertical. Other modes ignore this.
+     */
+    spread: 'fall' | 'slide' | 'apart';
+    /**
+     * mode 'title': left/right drift (px) applied in the CRACKED phase before the shatter -
+     * the pane spreads sideways while still holding. 0 = no pre-shatter drift (v0.6).
+     */
+    preSpreadPx: number;
   };
   motionBlur: {
     /** Whole-shard ghost copies (capped by quality.motionGhosts; 0 by default since v0.2). */

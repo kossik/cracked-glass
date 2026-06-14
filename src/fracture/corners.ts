@@ -1,60 +1,43 @@
 import type { CrackPolyline, Shard, Vec2 } from '../types';
-import { segmentIntersection, unflattenPts } from '../core/geometry';
+import { pointInPolygon, segmentIntersection, unflattenPts } from '../core/geometry';
 import { rand01 } from '../core/prng';
 import { makeCrack, makeShard, type ResolvedFracture } from './build';
 
-/** Strict point-in-triangle via consistent cross-product signs. */
-function pointInTriangle(p: Vec2, a: Vec2, b: Vec2, c: Vec2): boolean {
-  const d1 = (p[0] - b[0]) * (a[1] - b[1]) - (a[0] - b[0]) * (p[1] - b[1]);
-  const d2 = (p[0] - c[0]) * (b[1] - c[1]) - (b[0] - c[0]) * (p[1] - c[1]);
-  const d3 = (p[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (p[1] - a[1]);
-  const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
-  const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
-  return !(hasNeg && hasPos);
-}
-
 /**
- * The ear triangle [cutA, C, cutB] must be empty: no other owner vertex inside it and no
- * non-adjacent owner edge crossing the chord cutA->cutB. A re-entrant owner (extreme aspect
- * ratios + high jaggedness) can fold an edge back into the corner, where a blind cut would
- * self-intersect the remainder. When not clear, the corner is left intact (skip).
+ * A chord from corner vertex `ci` to vertex `vi` is an INTERNAL diagonal of the polygon iff
+ * its midpoint is inside and it crosses no non-incident edge. Both endpoints are existing
+ * polygon vertices, so the split introduces NO new vertex on any edge - neighbors that share
+ * the owner's edges are untouched (no T-vertex tear).
  */
-function earIsClear(pts: Vec2[], ci: number, cutA: Vec2, C: Vec2, cutB: Vec2): boolean {
+function chordIsInterior(pts: Vec2[], ci: number, vi: number): boolean {
   const n = pts.length;
+  const A = pts[ci];
+  const B = pts[vi];
+  const mid: Vec2 = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2];
+  if (!pointInPolygon(mid, pts)) return false;
   for (let j = 0; j < n; j++) {
-    if (j === ci || j === (ci - 1 + n) % n || j === (ci + 1) % n) continue;
-    if (pointInTriangle(pts[j], cutA, C, cutB)) return false;
-  }
-  for (let j = 0; j < n; j++) {
-    if (j === ci || j === (ci - 1 + n) % n) continue; // edges containing cutA/cutB are adjacent
-    const a = pts[j];
-    const b = pts[(j + 1) % n];
-    const hit = segmentIntersection(a, b, cutA, cutB);
+    const k = (j + 1) % n;
+    if (j === ci || k === ci || j === vi || k === vi) continue; // incident edges
+    const hit = segmentIntersection(pts[j], pts[k], A, B);
     if (hit && hit.ta > 1e-6 && hit.ta < 1 - 1e-6 && hit.tb > 1e-6 && hit.tb < 1 - 1e-6) return false;
   }
   return true;
 }
 
 /**
- * Corner relief: lop the perfect 90-degree shard off each canvas corner with a short
- * diagonal chord (real panes never break to a clean right angle).
+ * Corner relief: cracks RADIATE from each canvas corner vertex into the shard, splitting the
+ * corner piece into wedges (a real pane breaks AT the corner, it does not slice a clean
+ * triangle off it). Watertight AND index-stable, per adversarial review:
+ * - the owner is the SINGLE shard with the corner as an exact vertex (skip if 0 or 2 own it);
+ * - both corner-adjacent edges must be on the pane border (a true exposed right angle);
+ * - 1-2 chords run from the corner C to EXISTING non-adjacent vertices of the owner - never a
+ *   new mid-edge point, so no neighbour sharing a far edge gets a hanging T-vertex;
+ * - each chord is validated as an internal diagonal (interior midpoint, crosses no edge);
+ * - the owner is REPLACED IN PLACE (keeps id/hash/z), extra wedges are APPENDED, so no other
+ *   shard is renumbered; all-or-nothing (any degenerate wedge -> the corner is left intact).
  *
- * Watertight by construction AND index-stable, per adversarial review:
- * - the owner is selected by EXACT corner-vertex match; if 0 or 2 shards own the corner
- *   (near-edge radial impacts) the corner is SKIPPED (no tear, no crash);
- * - both corner-adjacent edges must lie on the rect border, and both must be long enough
- *   that the ear has real area (else makeShard would drop an area<2 sliver -> a hole);
- * - the radial crush plug (ringIndex 0) is skipped (its punch-through must stay a disc);
- * - an index-local EAR-CUT (not a generic chord split): the corner vertex is replaced by
- *   two cut points on its adjacent edges, giving exactly two simple polygons;
- * - the cut points are shared Vec2s spliced into both pieces, so the chord crack appears
- *   in exactly 2 shards (the watertight invariant);
- * - the owner is REPLACED IN PLACE (keeps its id/hash/z), the corner ear is APPENDED with a
- *   fresh index, so turning relief on never renumbers - thus never reshuffles the hash/pose
- *   of any other shard.
- *
- * Mutates `shards` and `cracks` in place. No-op when corners is false/relief 0 (byte anchor)
- * or for hero mode. Call BEFORE addStubCracks / micro seeding.
+ * Mutates `shards`/`cracks` in place. No-op when corners is false/relief 0 (byte anchor) or
+ * hero mode. Call BEFORE addStubCracks / micro seeding.
  */
 export function applyCornerRelief(o: ResolvedFracture, shards: Shard[], cracks: CrackPolyline[]): void {
   if (o.corners === false || o.corners.relief <= 0 || o.mode === 'hero') return;
@@ -70,6 +53,8 @@ export function applyCornerRelief(o: ResolvedFracture, shards: Shard[], cracks: 
   const baseN = shards.length;
   let maxZ = 0;
   for (const s of shards) if (s.z > maxZ) maxZ = s.z;
+  let appended = 0;
+  let crackId = 0;
 
   const corners: Vec2[] = [
     [0, 0],
@@ -80,7 +65,6 @@ export function applyCornerRelief(o: ResolvedFracture, shards: Shard[], cracks: 
 
   for (let c = 0; c < corners.length; c++) {
     const C = corners[c];
-    // Owner = shards with C as an exact polygon vertex. Exactly one, or skip.
     let ownerIdx = -1;
     let owners = 0;
     for (let si = 0; si < baseN; si++) {
@@ -96,65 +80,88 @@ export function applyCornerRelief(o: ResolvedFracture, shards: Shard[], cracks: 
     }
     if (owners !== 1) continue;
     const owner = shards[ownerIdx];
-    if (o.mode === 'radial' && owner.ringIndex === 0) continue; // crush plug stays a disc
+    // radial crush plug / web hub stay whole
+    if ((o.mode === 'radial' || o.mode === 'web') && owner.ringIndex === 0) continue;
 
-    const pts = unflattenPts(owner.polygon);
-    const n = pts.length;
-    let ci = -1;
+    const raw = unflattenPts(owner.polygon);
+    const n = raw.length;
+    if (n < 5) continue; // too few vertices to split into wedges
+    let ci0 = -1;
     for (let i = 0; i < n; i++) {
-      if (Math.abs(pts[i][0] - C[0]) < eps && Math.abs(pts[i][1] - C[1]) < eps) {
-        ci = i;
+      if (Math.abs(raw[i][0] - C[0]) < eps && Math.abs(raw[i][1] - C[1]) < eps) {
+        ci0 = i;
         break;
       }
     }
-    if (ci < 0) continue;
-    const prev = pts[(ci - 1 + n) % n];
-    const next = pts[(ci + 1) % n];
-    // Both adjacent edges must lie on the pane border (so no neighbor shares them).
-    if (!onBorder(prev, C) || !onBorder(C, next)) continue;
+    if (ci0 < 0) continue;
+    // both corner-adjacent edges on the border (a true exposed right angle)
+    if (!onBorder(raw[(ci0 - 1 + n) % n], C) || !onBorder(C, raw[(ci0 + 1) % n])) continue;
 
-    const lenPrev = Math.hypot(prev[0] - C[0], prev[1] - C[1]);
-    const lenNext = Math.hypot(next[0] - C[0], next[1] - C[1]);
-    // Cut size: scaled by relief, capped to the adjacent edges and the shard's own extent.
-    const cap = Math.min(0.4 * Math.sqrt(owner.area), 70);
+    // rotate so the corner is index 0 -> targets are plain forward offsets
+    const pts: Vec2[] = [...raw.slice(ci0), ...raw.slice(0, ci0)];
+
+    // wedge reach from the corner (like the old ear size, but landing on real vertices)
     const jit = 0.8 + 0.4 * rand01(seed, 'corner', c);
-    const target = relief * cap * jit;
-    const dA = Math.min(target, 0.85 * lenPrev);
-    const dB = Math.min(target, 0.85 * lenNext);
-    if (dA < 8 || dB < 8) continue; // too small -> would drop as a sliver
+    const reach = relief * Math.min(0.55 * Math.sqrt(owner.area), 95) * jit;
+    const distC = (i: number) => Math.hypot(pts[i][0] - C[0], pts[i][1] - C[1]);
 
-    const cutA: Vec2 = [
-      C[0] + ((prev[0] - C[0]) / lenPrev) * dA,
-      C[1] + ((prev[1] - C[1]) / lenPrev) * dA,
-    ];
-    const cutB: Vec2 = [
-      C[0] + ((next[0] - C[0]) / lenNext) * dB,
-      C[1] + ((next[1] - C[1]) / lenNext) * dB,
-    ];
-
-    // Re-entrant owners can fold an edge into the corner: only cut if the ear is empty.
-    if (!earIsClear(pts, ci, cutA, C, cutB)) continue;
-
-    // Ear-cut: triangle [cutA, C, cutB]; remainder = loop with C replaced by cutA, cutB.
-    const triangle: Vec2[] = [cutA, C, cutB];
-    const remainder: Vec2[] = [];
-    for (let i = 0; i < n; i++) {
-      if (i === ci) {
-        remainder.push(cutA, cutB);
-      } else {
-        remainder.push(pts[i]);
+    // pick the interior vertex nearest the reach distance, scanning forward (2..mid) and
+    // backward (n-2..mid); both must be valid internal diagonals.
+    const mid = Math.floor(n / 2);
+    const pick = (lo: number, hi: number, step: number): number => {
+      let best = -1;
+      let bestErr = Infinity;
+      for (let i = lo; step > 0 ? i <= hi : i >= hi; i += step) {
+        if (i <= 1 || i >= n - 1) continue;
+        if (distC(i) < 8) continue;
+        if (!chordIsInterior(pts, 0, i)) continue;
+        const err = Math.abs(distC(i) - reach);
+        if (err < bestErr) {
+          bestErr = err;
+          best = i;
+        }
       }
+      return best;
+    };
+    const vF = pick(2, mid, 1);
+    const vB = pick(n - 2, mid + 1, -1);
+
+    // assemble wedge pieces sharing C and the chord vertices
+    const targets: number[] = [];
+    if (vF > 0) targets.push(vF);
+    if (vB > 0 && vB !== vF) targets.push(vB);
+    targets.sort((a, b) => a - b);
+    if (targets.length === 0) continue;
+
+    const pieces: Vec2[][] = [];
+    pieces.push(pts.slice(0, targets[0] + 1)); // [C .. V1]
+    for (let k = 0; k + 1 < targets.length; k++) {
+      pieces.push([pts[0], ...pts.slice(targets[k], targets[k + 1] + 1)]); // [C, Vk .. Vk+1]
     }
+    pieces.push([pts[0], ...pts.slice(targets[targets.length - 1])]); // [C, Vlast .. last]
 
-    // Owner keeps its identity (id/hash/z) so no other shard is disturbed; ear is appended.
-    const rem = makeShard(seed, ownerIdx, remainder, owner.ringIndex, owner.z, o.seamOutsetPx);
-    const ear = makeShard(seed, baseN + c, triangle, owner.ringIndex, maxZ + 1 + c, o.seamOutsetPx);
-    if (!rem || !ear) continue; // degenerate -> leave this corner intact, never half-applied
+    // all-or-nothing: build every wedge, keep the corner intact if any is degenerate
+    const built: Shard[] = [];
+    let ok = true;
+    for (let k = 0; k < pieces.length; k++) {
+      const idx = k === 0 ? ownerIdx : baseN + appended + (k - 1);
+      const z = k === 0 ? owner.z : maxZ + 1 + appended + (k - 1);
+      const sh = makeShard(seed, idx, pieces[k], owner.ringIndex, z, o.seamOutsetPx);
+      if (!sh) {
+        ok = false;
+        break;
+      }
+      built.push(sh);
+    }
+    if (!ok) continue;
 
-    shards[ownerIdx] = rem;
-    shards.push(ear);
-    // The diagonal chord, shared by both pieces (cutA/cutB are the same floats in both).
-    const birth = 0.02 + 0.08 * rand01(seed, 'corner:birth', c);
-    cracks.push(makeCrack(seed, `cr${c}`, 'split', [cutA, cutB], birth, 0.35, false));
+    shards[ownerIdx] = built[0];
+    for (let k = 1; k < built.length; k++) shards.push(built[k]);
+    appended += built.length - 1;
+    // chords radiating from the corner; each is shared by its two flanking wedges
+    const birth = 0.0 + 0.06 * rand01(seed, 'corner:birth', c);
+    for (const v of targets) {
+      cracks.push(makeCrack(seed, `cr${crackId++}`, 'split', [C, pts[v]], birth, 0.32, false));
+    }
   }
 }

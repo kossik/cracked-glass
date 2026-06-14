@@ -31,6 +31,7 @@ export interface ResolvedFracture {
     diagonalChance: number;
     tilt: number;
     splitters: number;
+    diagonal: number;
   };
   impact: Vec2;
   impactHole: number;
@@ -45,7 +46,7 @@ export interface ResolvedFracture {
     merge: number;
   };
   hero: { count: number; sizeFrac: number; spread: number; overlap: number };
-  web: { rays: number; rings: number; irregularity: number };
+  web: { rays: number; rings: number; irregularity: number; dir: number; distance: number };
   corners: { relief: number } | false;
 }
 
@@ -87,6 +88,7 @@ export function resolveFractureOptions(opts: FractureOptions): ResolvedFracture 
       diagonalChance: clamp(opts.bands?.diagonalChance ?? 0.6, 0, 1),
       tilt: clamp(opts.bands?.tilt ?? 0.6, 0, 1),
       splitters: clamp(Math.round(opts.bands?.splitters ?? 3), 1, 3),
+      diagonal: clamp(opts.bands?.diagonal ?? 0.7, 0, 1),
     },
     impact: opts.impact
       ? [clamp(opts.impact.x, 0, opts.width), clamp(opts.impact.y, 0, opts.height)]
@@ -123,9 +125,11 @@ export function resolveFractureOptions(opts: FractureOptions): ResolvedFracture 
       overlap: clamp(opts.hero?.overlap ?? 0, 0, 1),
     },
     web: {
-      rays: Math.max(3, Math.round(opts.web?.rays ?? 7)),
+      rays: Math.max(3, Math.round(opts.web?.rays ?? 9)),
       rings: Math.max(1, Math.round(opts.web?.rings ?? 4)),
       irregularity: clamp(opts.web?.irregularity ?? 0.6, 0, 1),
+      dir: opts.web?.dir ?? 90,
+      distance: clamp(opts.web?.distance ?? 1.2, 0.2, 6),
     },
     corners:
       opts.corners === false ? false : { relief: clamp(opts.corners?.relief ?? 0.55, 0, 1) },

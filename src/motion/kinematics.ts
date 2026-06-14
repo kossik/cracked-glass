@@ -159,10 +159,23 @@ export function shardMotion(
     dirY /= n;
     speed = sh.speed * 0.18 * jitter(0.6);
   } else {
-    // title: slabs fall, drifting apart horizontally a bit.
-    const drift = (rng() * 2 - 1) * 0.35;
-    dirX = drift;
-    dirY = 0.45 + rng() * 0.4;
+    // title: how the slabs leave depends on fx.shatter.spread. The side (left/right half)
+    // is a pure function of the shard centroid - no rng draw, so 'fall' keeps the v0.6
+    // rng order and is byte-identical.
+    const side = shard.centroid[0] < pattern.width / 2 ? -1 : 1;
+    if (sh.spread === 'apart') {
+      // halves blast apart sideways toward the viewer, little vertical
+      dirX = side * (0.85 + rng() * 0.15);
+      dirY = 0.12 + rng() * 0.18;
+    } else if (sh.spread === 'slide') {
+      // each piece slides out to its own side then gravity pulls it down (a parabola)
+      dirX = side * (0.5 + rng() * 0.25);
+      dirY = 0.35 + rng() * 0.3;
+    } else {
+      // 'fall' (v0.6): random drift, mostly downward
+      dirX = (rng() * 2 - 1) * 0.35;
+      dirY = 0.45 + rng() * 0.4;
+    }
     const n = Math.hypot(dirX, dirY) || 1;
     dirX /= n;
     dirY /= n;
@@ -225,6 +238,15 @@ export function microMotion(
     // dust falls in a narrow downward cone
     dirX = (rng() * 2 - 1) * 0.3;
     dirY = 0.5 + rng() * 0.5;
+    const n = Math.hypot(dirX, dirY) || 1;
+    dirX /= n;
+    dirY /= n;
+  } else if (fx.shatter.spread !== 'fall') {
+    // title slide/apart: dust leaves toward its own side (left half left, right half right)
+    const side = origin[0] < pattern.width / 2 ? -1 : 1;
+    const lateral = fx.shatter.spread === 'apart' ? 0.8 : 0.5;
+    dirX = side * lateral + (rng() * 2 - 1) * 0.2;
+    dirY = (fx.shatter.spread === 'apart' ? 0.2 : 0.5) + rng() * 0.4;
     const n = Math.hypot(dirX, dirY) || 1;
     dirX /= n;
     dirY /= n;
