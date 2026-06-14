@@ -134,6 +134,9 @@ export function App() {
         <h1>
           cracked-<span>glass</span> / demo
         </h1>
+        <a className="cross-link" href={`${import.meta.env.BASE_URL}lab.html`}>
+          → open the Lab (full control panel)
+        </a>
         <div className="field">
           <label>Scene</label>
           <select value={scene} onChange={(e) => setScene(e.target.value as SceneId)}>

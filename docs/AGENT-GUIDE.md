@@ -49,6 +49,29 @@ A hard impact works with near-linear `t` and no hold. Scrubbing backwards is leg
 crushed glass. The spectral flare is a delicacy: `spectrum.count 1-2`, `opacity ≤ 0.35`; it is
 bound to the light source and glints on its own as a shard turns.
 
+## Glass vs content, and the floating hero
+
+`fx.medium` decides *what breaks*:
+- **`content`** (default) — the content itself shatters; pieces carry their image away. Use for
+  screen transitions where a second screen is revealed underneath.
+- **`glass`** — a glass pane lies *over* the content; shards become moving lenses and the page
+  seen through them stays anchored. Use for "broken overlay" looks where the content must remain
+  legible. Glass cannot reveal a second screen (the content stays put) — pair it with
+  `optics.trackLight: true` so highlights, chroma and the flare keep pointing at the light as a
+  shard turns, otherwise a slowly-floating shard looks static.
+
+`mode: 'hero'` makes 1–3 free shards levitating over content (`fx.float` bob/sway/rock), every
+edge a fracture face — built for close-up "specimen" shots rather than full-frame transitions.
+`fx.edgeDistortion` adds a prism rim (the fractured faces bend the content hardest at the edge);
+`fx.spectrum.edgeOnly` pulls the rainbow flare onto the lit rim of small shards.
+
+## Motion presets
+
+Spread a named preset instead of hand-tuning timing: `impactTimeline` + `hardBlastShatter`
+(aggression), `suspenseTimeline` (the long wait), `gentleCrumbleShatter` (melancholy fall),
+`staticCrackedTimeline` (poster). They set only timing/flight, so they compose with any mode,
+medium and palette.
+
 ## The seed is a casting call
 
 Generate 5–10 seeds and pick by composition: the impact hole must not sit on a face, a splitter

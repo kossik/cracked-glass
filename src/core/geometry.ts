@@ -236,6 +236,44 @@ export function toSvgPathD(poly: ArrayLike<number>, closed: boolean, precision =
   return closed ? d + 'Z' : d;
 }
 
+/**
+ * Per-vertex inset toward the centroid - the inner loop of edge rings. Each vertex moves
+ * a fixed distance (capped at 45% of its centroid distance, so thin slivers never invert).
+ */
+export function insetPolygonTowardCentroid(
+  flat: ArrayLike<number>,
+  centroid: Vec2,
+  inset: number,
+): number[] {
+  const out: number[] = [];
+  for (let i = 0; i + 1 < flat.length; i += 2) {
+    const dx = centroid[0] - flat[i];
+    const dy = centroid[1] - flat[i + 1];
+    const d = Math.hypot(dx, dy) || 1;
+    const m = Math.min(inset, d * 0.45) / d;
+    out.push(flat[i] + dx * m, flat[i + 1] + dy * m);
+  }
+  return out;
+}
+
+/** Reverse a flat [x,y]* polygon (flips the winding). */
+export function reverseFlat(flat: ArrayLike<number>): number[] {
+  const out: number[] = [];
+  for (let i = flat.length - 2; i >= 0; i -= 2) {
+    out.push(flat[i], flat[i + 1]);
+  }
+  return out;
+}
+
+/**
+ * Perimeter-ring path: outer outline + REVERSED inner loop. With the default nonzero
+ * fill rule the opposite winding of the inner loop punches the hole - works as an SVG
+ * path fill, an SVG clipPath and a CSS `path("...")` clip without any evenodd support.
+ */
+export function ringPathD(outerFlat: ArrayLike<number>, innerFlat: ArrayLike<number>): string {
+  return toSvgPathD(outerFlat, true) + toSvgPathD(reverseFlat(innerFlat), true);
+}
+
 export function toSvgPoints(poly: ArrayLike<number>, precision = 2): string {
   const parts: string[] = [];
   for (let i = 0; i + 1 < poly.length; i += 2) {

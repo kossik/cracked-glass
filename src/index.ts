@@ -17,6 +17,14 @@ export { normalizeEffectParams, defaultEffectParams } from './render/params';
 export { resolveQuality, qualityPresets } from './render/quality';
 export { staticCrackedTimeline, resolvePhase } from './motion/timeline';
 export { flightOffset, flightSpeed } from './motion/kinematics';
+export {
+  impactTimeline,
+  suspenseTimeline,
+  hardBlastShatter,
+  gentleCrumbleShatter,
+  motionPresets,
+  type MotionPreset,
+} from './motion/presets';
 
 import type { EffectParams } from './types';
 

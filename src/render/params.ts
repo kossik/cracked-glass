@@ -3,8 +3,9 @@ import type { DeepPartial, EffectParams } from '../types';
 export const defaultEffectParams: EffectParams = {
   quality: 'normal',
   timeline: { crackStart: 0.05, crackEnd: 0.38, shatterStart: 0.48 },
+  medium: 'content',
   refraction: { offsetPx: 6, rotateDeg: 0.9, scaleAmp: 0.016, tiltDeg: 1.6, perspectivePx: 800 },
-  optics: { brightnessAmp: 0.13, contrastAmp: 0.07, blurPx: 0.5, lightAngleDeg: -60, grainOpacity: 0.06 },
+  optics: { brightnessAmp: 0.13, contrastAmp: 0.07, blurPx: 0.5, lightAngleDeg: -60, grainOpacity: 0.06, trackLight: false },
   chroma: {
     mode: 'shadow',
     offsetPx: 2.6,
@@ -56,7 +57,9 @@ export const defaultEffectParams: EffectParams = {
     opacity: 0.3,
     bandWidth: 0.6,
     blendMode: 'screen',
+    edgeOnly: 0,
   },
+  edgeDistortion: { widthPx: 10, strength: 0, blurPx: 0.6 },
   shatter: {
     speed: 950,
     gravity: [0, 1250],
@@ -70,6 +73,7 @@ export const defaultEffectParams: EffectParams = {
   motionBlur: { dt: 0.012, opacityFalloff: 0.5, speedThreshold: 140, smearPx: 14, smearBlurPx: 1.2 },
   micro: { opacity: 0.85, speedScale: 1.5, fill: 'rgba(255,255,255,0.85)', fillAlt: 'rgba(20,26,34,0.6)' },
   settle: { amplitudePx: 0, frequency: 2.2 },
+  float: { bobPx: 10, swayPx: 6, rotDeg: 2.5, cycles: 1 },
 };
 
 /** Deep-merge user overrides over the defaults (arrays/tuples are replaced atomically). */
@@ -79,6 +83,7 @@ export function normalizeEffectParams(fx?: DeepPartial<EffectParams>): EffectPar
   return {
     quality: (fx.quality as EffectParams['quality']) ?? d.quality,
     timeline: { ...d.timeline, ...fx.timeline },
+    medium: fx.medium ?? d.medium,
     refraction: { ...d.refraction, ...fx.refraction },
     optics: { ...d.optics, ...fx.optics },
     chroma: { ...d.chroma, ...fx.chroma },
@@ -88,9 +93,11 @@ export function normalizeEffectParams(fx?: DeepPartial<EffectParams>): EffectPar
     crush: { ...d.crush, ...fx.crush },
     outliers: { ...d.outliers, ...fx.outliers },
     spectrum: { ...d.spectrum, ...fx.spectrum },
+    edgeDistortion: { ...d.edgeDistortion, ...fx.edgeDistortion },
     shatter: { ...d.shatter, ...fx.shatter } as EffectParams['shatter'],
     motionBlur: { ...d.motionBlur, ...fx.motionBlur },
     micro: { ...d.micro, ...fx.micro },
     settle: { ...d.settle, ...fx.settle },
+    float: { ...d.float, ...fx.float },
   };
 }

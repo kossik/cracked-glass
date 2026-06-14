@@ -2,9 +2,9 @@ import type { EffectParams, FracturePattern, QualitySettings, Shard, ShardFrame,
 import type { PhaseInfo } from '../motion/timeline';
 import { TAU, clamp, clamp01, degToRad, easeOutCubic, fmt } from '../core/math';
 import { hashCombine, hashString, hashTo01, rngFor } from '../core/prng';
-import { toCssPolygon } from '../core/geometry';
+import { insetPolygonTowardCentroid, ringPathD, toCssPolygon } from '../core/geometry';
 import { flightOffset, flightSpeed, shardMotion, type OutlierKind } from '../motion/kinematics';
-import { settleOffset } from '../motion/settle';
+import { floatOffset, settleOffset } from '../motion/settle';
 
 const BEVEL_SECTORS = 12;
 
@@ -226,16 +226,50 @@ export function buildShardFrame(
     slipRot = slipSign * fx.outliers.slipRotDeg * (0.5 + slipMagF) * ease;
   }
 
-  // --- rigid totals (mirrored into raw.rigid so both tiers stay in lockstep) ---
-  const rigidDx = fdx + st.dx + slipDx + gdir[0] * sinkPx;
-  const rigidDy = fdy + st.dy + slipDy + gdir[1] * sinkPx;
-  const rigidRot = spin + st.rot + slipRot;
+  // --- hero levitation (mode 'hero' only - other modes keep their byte-exact output) ---
+  const fl =
+    pattern.mode === 'hero' ? floatOffset(t, shard.hash, fx.float) : { dx: 0, dy: 0, rot: 0 };
 
-  let shardTransform = `translate(${fmt(rigidDx)}px, ${fmt(rigidDy)}px)`;
-  if (fx.shatter.tumbleDegMax > 0 && flying) {
-    shardTransform += ` perspective(${fmt(fx.refraction.perspectivePx)}px) rotateX(${fmt(tumX, 3)}deg) rotateY(${fmt(tumY, 3)}deg)`;
+  // --- rigid totals (mirrored into raw.rigid so both tiers stay in lockstep) ---
+  const rigidDx = fdx + st.dx + slipDx + fl.dx + gdir[0] * sinkPx;
+  const rigidDy = fdy + st.dy + slipDy + fl.dy + gdir[1] * sinkPx;
+  const rigidRot = spin + st.rot + slipRot + fl.rot;
+
+  // --- glass medium: the shard is a moving LENS over content anchored to the pane ---
+  // The content clone gets the inverse rigid transform so the background stays put while
+  // the silhouette flies. Constraints established by adversarial review:
+  // - rigid 3D tumble is omitted (a clipped wrapper flattens transforms; no child can
+  //   compensate perspective, and the residual error grows with flight distance);
+  // - the wrapper is emitted from PRE-ROUNDED components and the inverse from the exact
+  //   negatives of those - the pair cancels to the browser's own precision;
+  // - the scale is clamped symmetrically (wrapper AND inverse) so 1/s stays bounded;
+  // - refraction is re-anchored about the FLOWN centroid (the trailing translate(-d)),
+  //   so lens distortion does not grow with flight distance.
+  const glass = fx.medium === 'glass';
+  const glassInv = glass
+    ? {
+        dx: Number(fmt(rigidDx)),
+        dy: Number(fmt(rigidDy)),
+        rot: Number(fmt(rigidRot, 3)),
+        scale: Number(fmt(Math.max(rigidScale, 0.05), 4)),
+      }
+    : null;
+  /** Wraps a refraction core list into inv(T_rigid) * core * translate(-flight). */
+  const glassWrap = (core: string): string =>
+    glassInv
+      ? `scale(${fmt(1 / glassInv.scale, 6)}) rotate(${fmt(-glassInv.rot, 3)}deg) ${core} translate(${fmt(-glassInv.dx)}px, ${fmt(-glassInv.dy)}px)`
+      : core;
+
+  let shardTransform: string;
+  if (glassInv) {
+    shardTransform = `translate(${fmt(glassInv.dx)}px, ${fmt(glassInv.dy)}px) rotate(${fmt(glassInv.rot, 3)}deg) scale(${fmt(glassInv.scale, 4)})`;
+  } else {
+    shardTransform = `translate(${fmt(rigidDx)}px, ${fmt(rigidDy)}px)`;
+    if (fx.shatter.tumbleDegMax > 0 && flying) {
+      shardTransform += ` perspective(${fmt(fx.refraction.perspectivePx)}px) rotateX(${fmt(tumX, 3)}deg) rotateY(${fmt(tumY, 3)}deg)`;
+    }
+    shardTransform += ` rotate(${fmt(rigidRot, 3)}deg) scale(${fmt(rigidScale, 4)})`;
   }
-  shardTransform += ` rotate(${fmt(rigidRot, 3)}deg) scale(${fmt(rigidScale, 4)})`;
 
   // --- refraction (content inside the stationary shape) ---
   const refDx = Math.cos(pose.refrAngle) * pose.refrMag * ease;
@@ -245,15 +279,22 @@ export function buildShardFrame(
   const tiltX = Math.sin(pose.tiltAxis) * pose.tiltMag * ease;
   const tiltY = Math.cos(pose.tiltAxis) * pose.tiltMag * ease;
 
-  let contentTransform = `translate(${fmt(refDx)}px, ${fmt(refDy)}px)`;
+  let refrCore = `translate(${fmt(refDx)}px, ${fmt(refDy)}px)`;
   if (fx.refraction.tiltDeg > 0) {
-    contentTransform += ` perspective(${fmt(fx.refraction.perspectivePx)}px) rotateX(${fmt(tiltX, 3)}deg) rotateY(${fmt(tiltY, 3)}deg)`;
+    refrCore += ` perspective(${fmt(fx.refraction.perspectivePx)}px) rotateX(${fmt(tiltX, 3)}deg) rotateY(${fmt(tiltY, 3)}deg)`;
   }
-  contentTransform += ` rotate(${fmt(refRot, 3)}deg) scale(${fmt(refScale, 4)})`;
+  refrCore += ` rotate(${fmt(refRot, 3)}deg) scale(${fmt(refScale, 4)})`;
+  const contentTransform = glassWrap(refrCore);
 
   // --- facet lighting -> brightness/contrast ---
-  const lightDot =
-    Math.cos(pose.tiltAxis - lightRad) * (0.35 + 0.65 * (pose.tiltMag / Math.max(0.001, fx.refraction.tiltDeg || 1)));
+  // trackLight: the facet plane turns with the shard, so its alignment with the global
+  // light changes as the shard spins. false takes the verbatim v0.4 expression (anchor).
+  const live = fx.optics.trackLight;
+  const lightDot = live
+    ? Math.cos(pose.tiltAxis + degToRad(rigidRot) - lightRad) *
+      (0.35 + 0.65 * (pose.tiltMag / Math.max(0.001, fx.refraction.tiltDeg || 1)))
+    : Math.cos(pose.tiltAxis - lightRad) *
+      (0.35 + 0.65 * (pose.tiltMag / Math.max(0.001, fx.refraction.tiltDeg || 1)));
   const brightness = 1 + fx.optics.brightnessAmp * lightDot * ease;
   const contrast = 1 + fx.optics.contrastAmp * pose.contrastSign * ease;
   // Content blur: optics blur + speed-scaled motion blur addition (the clip stays crisp).
@@ -261,10 +302,21 @@ export function buildShardFrame(
   const blurPx = clamp(clamp(fx.optics.blurPx, 0, q.maxBlurPx) * ease + smearBlurAdd, 0, q.maxBlurPx);
 
   // --- chromatic aberration ---
+  // trackLight: counter-rotate the dispersion axis by the shard spin. The filter layers
+  // live in wrapper-local space in BOTH tiers (HTML hoists the filter onto a no-transform
+  // div in glass mode), so one corrected pair serves drop-shadows, ghosts and feOffset.
   const chromaScale = (ease + (flying ? Math.min(1, tau * 2.2) : 0)) * pose.chromaMagF;
-  const chRad = degToRad(fx.chroma.angleDeg);
-  const chDx = Math.cos(chRad) * fx.chroma.offsetPx * chromaScale;
-  const chDy = Math.sin(chRad) * fx.chroma.offsetPx * chromaScale;
+  let chDx: number;
+  let chDy: number;
+  if (live) {
+    const chRadLive = degToRad(fx.chroma.angleDeg - rigidRot);
+    chDx = Math.cos(chRadLive) * fx.chroma.offsetPx * chromaScale;
+    chDy = Math.sin(chRadLive) * fx.chroma.offsetPx * chromaScale;
+  } else {
+    const chRad = degToRad(fx.chroma.angleDeg);
+    chDx = Math.cos(chRad) * fx.chroma.offsetPx * chromaScale;
+    chDy = Math.sin(chRad) * fx.chroma.offsetPx * chromaScale;
+  }
 
   let contentFilter = `brightness(${fmt(brightness, 3)}) contrast(${fmt(contrast, 3)})`;
   const smearFilter = contentFilter;
@@ -277,10 +329,23 @@ export function buildShardFrame(
 
   const chroma: ShardFrame['chroma'] = [];
   if (fx.chroma.mode === 'ghost' && q.chromaGhosts > 0 && fx.chroma.offsetPx > 0) {
+    // Glass: the inverse prefix anchors the ghost to the pane, so its translate lands in
+    // SCREEN space verbatim - build the screen-target axis directly (lens-attached when
+    // not tracking the light, light-fixed when tracking). chDx/chDy are wrapper-local
+    // values and would counter-spin on screen if embedded as-is.
+    let gChDx = chDx;
+    let gChDy = chDy;
+    if (glass) {
+      const gRad = degToRad(live ? fx.chroma.angleDeg : fx.chroma.angleDeg + rigidRot);
+      gChDx = Math.cos(gRad) * fx.chroma.offsetPx * chromaScale;
+      gChDy = Math.sin(gRad) * fx.chroma.offsetPx * chromaScale;
+    }
     const signs = q.chromaGhosts === 1 ? [1] : [1, -1];
     for (const sign of signs) {
       chroma.push({
-        transform: `translate(${fmt(refDx + sign * chDx)}px, ${fmt(refDy + sign * chDy)}px) rotate(${fmt(refRot, 3)}deg) scale(${fmt(refScale, 4)})`,
+        transform: glassWrap(
+          `translate(${fmt(refDx + sign * gChDx)}px, ${fmt(refDy + sign * gChDy)}px) rotate(${fmt(refRot, 3)}deg) scale(${fmt(refScale, 4)})`,
+        ),
         filter: `hue-rotate(${sign > 0 ? 115 : -115}deg) saturate(1.7)`,
         mixBlendMode: fx.chroma.blendMode,
         opacity: fx.chroma.opacity * ease * opacity,
@@ -289,11 +354,14 @@ export function buildShardFrame(
   }
 
   // --- facet glass layer (highlights deliberately lighter than the dark side) ---
+  // trackLight: the facet layer rides the rotating wrapper, so counter-rotate its
+  // gradient to keep the highlight pointing at the global light.
+  const facetAngleOut = live ? pose.facetAngle - rigidRot : pose.facetAngle;
   const facetWhite = fx.facet.strength * 0.65 * pose.facetMag;
   const facetBlack = fx.facet.strength * 0.5 * pose.facetMag;
   let facet: ShardFrame['facet'] = null;
   if (fx.facet.opacity > 0 && fx.facet.strength > 0) {
-    let background = `linear-gradient(${fmt(pose.facetAngle, 1)}deg, rgba(255,255,255,${fmt(facetWhite, 3)}) 0%, rgba(255,255,255,0) 38%, rgba(0,0,0,0) 62%, rgba(0,0,0,${fmt(facetBlack, 3)}) 100%)`;
+    let background = `linear-gradient(${fmt(facetAngleOut, 1)}deg, rgba(255,255,255,${fmt(facetWhite, 3)}) 0%, rgba(255,255,255,0) 38%, rgba(0,0,0,0) 62%, rgba(0,0,0,${fmt(facetBlack, 3)}) 100%)`;
     if (fx.facet.tint) background += `, linear-gradient(0deg, ${fx.facet.tint}, ${fx.facet.tint})`;
     facet = {
       background,
@@ -302,10 +370,56 @@ export function buildShardFrame(
     };
   }
 
+  // --- perimeter ring geometry (shared by the edge-refraction layer and edge spectrum) ---
+  // The ring path = outer outline + REVERSED inner inset loop: the default nonzero fill
+  // rule punches the hole, so it works as a CSS path() clip and an SVG clipPath alike.
+  const wantEdge = q.edgeDistortion && fx.edgeDistortion.strength > 0 && fx.edgeDistortion.widthPx > 0.5;
+  const wantSpectrumRing = spectral !== null && fx.spectrum.edgeOnly > 0;
+  let ringD = '';
+  let ringClipCss = '';
+  if (wantEdge || wantSpectrumRing) {
+    const inner = insetPolygonTowardCentroid(shard.polygon, shard.centroid, fx.edgeDistortion.widthPx);
+    ringD = ringPathD(shard.polygon, inner);
+    ringClipCss = `path("${ringD}")`;
+  }
+
+  // --- edge refraction ring: the fractured faces act as prisms on the content behind ---
+  let edge: ShardFrame['edge'] = null;
+  if (wantEdge) {
+    const k = 1 + 1.6 * fx.edgeDistortion.strength;
+    const eDx = refDx * k;
+    const eDy = refDy * k;
+    const eRot = refRot * (1 + 0.6 * fx.edgeDistortion.strength);
+    const eScale = refScale * (1 + 0.045 * fx.edgeDistortion.strength * ease);
+    let edgeCore = `translate(${fmt(eDx)}px, ${fmt(eDy)}px)`;
+    if (fx.refraction.tiltDeg > 0) {
+      edgeCore += ` perspective(${fmt(fx.refraction.perspectivePx)}px) rotateX(${fmt(tiltX, 3)}deg) rotateY(${fmt(tiltY, 3)}deg)`;
+    }
+    edgeCore += ` rotate(${fmt(eRot, 3)}deg) scale(${fmt(eScale, 4)})`;
+    const eBlur = clamp(fx.edgeDistortion.blurPx, 0, q.maxBlurPx);
+    let edgeFilter = contentFilter;
+    if (eBlur > 0.02) edgeFilter += ` blur(${fmt(eBlur, 2)}px)`;
+    edge = {
+      clipPath: ringClipCss,
+      d: ringD,
+      transform: glassWrap(edgeCore),
+      filter: edgeFilter,
+      opacity: ease, // ramps in with the crack network; the wrapper already carries shard opacity
+      dx: eDx,
+      dy: eDy,
+      rot: eRot,
+      scale: eScale,
+    };
+  }
+
   // --- spectral dispersion flare (selection precomputed in computeFrame, light-aligned) ---
   let spectrum: ShardFrame['spectrum'] = null;
   if (spectral) {
-    const cssAngle = fx.optics.lightAngleDeg + 90; // CSS 0deg = up; our 0deg = +x
+    // trackLight: both tiers paint the flare inside the rotating wrapper, so the same
+    // -rigidRot correction keeps it on the light axis (SVG recomputes endpoints from
+    // the corrected angleDeg per frame - parity holds with no tier-specific terms).
+    const specAngle = live ? fx.optics.lightAngleDeg - rigidRot : fx.optics.lightAngleDeg;
+    const cssAngle = live ? specAngle + 90 : fx.optics.lightAngleDeg + 90; // CSS 0deg = up; our 0deg = +x
     const c = spectral.center01 * 100;
     const hw = (spectral.width01 * 100) / 2;
     const stops =
@@ -319,10 +433,15 @@ export function buildShardFrame(
       background: `linear-gradient(${fmt(cssAngle, 1)}deg, ${stops})`,
       mixBlendMode: fx.spectrum.blendMode,
       opacity: fx.spectrum.opacity * ease * opacity * glint,
-      angleDeg: fx.optics.lightAngleDeg,
+      angleDeg: specAngle,
       center01: spectral.center01,
       width01: spectral.width01,
     };
+    if (wantSpectrumRing) {
+      // Dispersion happens at the fractured faces: hug the rim instead of washing the body.
+      spectrum.clipPath = ringClipCss;
+      spectrum.d = ringD;
+    }
   }
 
   // --- edge bevel: static sectors with a static specular/shaded edge split. With
@@ -370,9 +489,12 @@ export function buildShardFrame(
 
   // --- content smear: motion blur of the content while the shard edge stays crisp ---
   // ALWAYS exactly q.smearGhosts entries (opacity 0 when idle) - constant DOM structure.
+  // Glass medium: the content does NOT move with the lens, so a positional trail would
+  // re-introduce exactly the motion anchoring removes - entries stay at opacity 0 and
+  // motion reads through the speed-scaled blur already in contentFilter.
   const smear: ShardFrame['smear'] = [];
   if (q.smearGhosts > 0) {
-    const active = flying && speedStrength > 0;
+    const active = !glass && flying && speedStrength > 0;
     let deltas: Vec2[] = [];
     if (active) {
       const raw: Vec2[] = [];
@@ -400,8 +522,10 @@ export function buildShardFrame(
   }
 
   // --- whole-shard motion ghosts (off by default since v0.2; kept as an explicit opt-in) ---
+  // Disabled in glass medium: a ghost would show the content at a stale pose, which
+  // anchoring makes meaningless (the lens trail idea fails the same way as smear).
   const ghosts: ShardFrame['ghosts'] = [];
-  const ghostCount = Math.min(q.motionGhosts, fx.motionBlur.ghosts ?? q.motionGhosts);
+  const ghostCount = glass ? 0 : Math.min(q.motionGhosts, fx.motionBlur.ghosts ?? q.motionGhosts);
   if (flying && ghostCount > 0 && speedStrength > 0) {
     for (let k = 1; k <= ghostCount; k++) {
       const tk = tau - k * fx.motionBlur.dt;
@@ -431,20 +555,31 @@ export function buildShardFrame(
     zIndex: (shard.z + 1) * 10,
     facet,
     spectrum,
+    edge,
     chroma,
     ghosts,
     smear,
     smearFilter,
     bevel,
     raw: {
-      rigid: { dx: rigidDx, dy: rigidDy, rotZ: rigidRot, rotX: tumX, rotY: tumY, scale: rigidScale },
+      // glass: tumble is hard-disabled and the scale is clamped (matches raw.glass and the
+      // emitted strings, so a consumer composing from raw.rigid stays in lockstep)
+      rigid: {
+        dx: rigidDx,
+        dy: rigidDy,
+        rotZ: rigidRot,
+        rotX: glass ? 0 : tumX,
+        rotY: glass ? 0 : tumY,
+        scale: glassInv ? glassInv.scale : rigidScale,
+      },
       refraction: { dx: refDx, dy: refDy, rot: refRot, scale: refScale, tiltX, tiltY },
+      glass: glassInv,
       brightness,
       contrast,
       blurPx,
       chromaDx: chDx,
       chromaDy: chDy,
-      facetAngleDeg: pose.facetAngle,
+      facetAngleDeg: facetAngleOut,
       facetWhite,
       facetBlack,
     },

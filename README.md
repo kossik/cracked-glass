@@ -10,11 +10,13 @@ the same `t` must produce pixel-identical output.
 npm install cracked-glass
 ```
 
-Three fracture modes (`title` — broken headline, `radial` — impact web with a punched-out
-center, `collapse` — diagonal mesh crumbling out of its frame), two renderers (HTML clone tier
-for arbitrary content, single-`<svg>` premium tier for headlines with true per-channel chromatic
-decomposition), micro-debris, edge bevels with conchoidal light scatter, outlier shards,
-spectral flares — all driven by one `t` prop.
+Four fracture modes (`title` — broken headline, `radial` — impact web with a punched-out
+center, `collapse` — diagonal mesh crumbling out of its frame, `hero` — free shards levitating
+over content), two media (`content` — the content itself breaks; `glass` — a glass pane over
+anchored content, shards become moving lenses), two renderers (HTML clone tier for arbitrary
+content, single-`<svg>` premium tier for headlines with true per-channel chromatic
+decomposition), micro-debris, edge bevels with conchoidal light scatter, corner relief, outlier
+shards, edge-refraction rims and spectral flares — all driven by one `t` prop.
 
 ## Showcase
 
@@ -41,6 +43,13 @@ SVG premium text tier — true `feColorMatrix` channel decomposition (`<CrackedG
 | channel split | broken | shatter |
 |---|---|---|
 | ![text split](docs/showcase/text-svg-03.png) | ![text broken](docs/showcase/text-svg-05.png) | ![text shatter](docs/showcase/text-svg-062.png) |
+
+A shard levitating over content as a moving lens — the page stays put, only the refraction
+travels (`mode: 'hero'`, `medium: 'glass'`):
+
+| glass lens over the page | edge close-up: prism rim + spectral flare |
+|---|---|
+| ![hero glass](docs/showcase/hero-glass.png) | ![hero macro edge](docs/showcase/hero-macro-edge.png) |
 
 ```
 generateFracture(opts)        -> FracturePattern   // t-independent geometry, frozen, cacheable
@@ -208,10 +217,14 @@ transition an `<img>` snapshot of the screen, or use `draft`.
   animating those params re-picks the carrier shards and pops DOM (animating `t` never does).
 - Under 'screen' blending the rainbow band is invisible over pure-white content (screen with
   white is white) - expected glass-flare physics; it reads in darker regions of the shard.
-- `FracturePattern.version` is 3 since the punched-center release: the radial crush radius
-  default changed (min(w,h)-based) and the crush disc is now rect-clipped, so radial patterns
-  regenerate differently than v2 for the same seed.
-
+- `FracturePattern.version` is 5: corner relief is on by default (a diagonal chord lops the
+  90-degree shard off each canvas corner), so partition patterns regenerate differently than
+  v4 for the same seed. Pass `corners: false` for the pre-relief geometry.
+- Jagged rim (a slightly oversized slab with a broken perimeter) is not in 0.5 — it needs an
+  enlarged render viewBox and generator-level shared-perimeter jagging; tracked for 0.6.
+- `medium: 'glass'` is screen-space: each shard refracts only the underlying content; shards
+  never see each other (no neighbor reflections, no compounded refraction where lenses overlap,
+  no cast shadows). 3D rigid tumble is disabled in glass (a clipped wrapper flattens transforms).
 - Backdrop ("content under the container") mode ships degraded by physics: no backdrop
   displacement without WebGL (see verdict table). Planned as a separate `target` once needed.
 - SVG text tier: SVG `<text>` only (no HTML wrapping), 2D-only shard motion.
@@ -225,15 +238,31 @@ How to *play* this instrument — mood-to-parameter recipes, pacing curves, ligh
 seed casting — lives in [docs/AGENT-GUIDE.md](docs/AGENT-GUIDE.md) (written for AI agents
 building motion-design systems, useful for humans too).
 
+## Lab (interactive sandbox)
+
+[![the Lab](docs/showcase/lab-ui.png)](https://kossik.github.io/cracked-glass/lab.html)
+
+Tune the effect in the browser: every `fx` knob and fracture option as a live control, scene
+presets, randomizers, `t` playback with easings, pin-and-compare, and shareable URLs. Find a
+look, then read the state off the controls (or a shared link) into your code.
+
+- **Play now:** **https://kossik.github.io/cracked-glass/lab.html**
+- **Locally:** `npm run dev` → open `/lab.html`.
+- Full tour: [docs/LAB.md](docs/LAB.md).
+
 ## License
 
 [MIT](LICENSE).
 
 ## Repository scripts
 
-- `npm run dev` — demo with a manual t-scrubber (no clocks), scrub scripts, seam-inspection zoom,
-  debug overlay, perf HUD.
+- `npm run dev` — demo + [Lab](docs/LAB.md): manual t-scrubber (no clocks), scene presets, every
+  knob, playback, pin-and-compare, seam-inspection zoom, perf HUD.
 - `npm test` — vitest suite: determinism, geometry/fracture invariants, forbidden APIs, same-svg.
 - `npm run build` — `tsc` → `dist/` (ESM + d.ts).
 - `npm run capture:check` — byte-identical screenshot determinism on a real Chromium.
 - `npm run capture:measure` — the perf table above.
+- `npm run lab:preview` / `npm run lab:smoke` — Lab scene screenshots / interaction smoke test.
+
+The Lab is auto-deployed to GitHub Pages on every push to `master`
+([.github/workflows/deploy.yml](.github/workflows/deploy.yml)).

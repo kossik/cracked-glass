@@ -10,7 +10,7 @@
 
 export type Vec2 = readonly [number, number];
 
-export type FractureMode = 'title' | 'radial' | 'collapse';
+export type FractureMode = 'title' | 'radial' | 'collapse' | 'hero';
 
 /** Options for generateFracture(). width/height/seed are mandatory: the library never measures the DOM. */
 export interface FractureOptions {
@@ -106,6 +106,31 @@ export interface FractureOptions {
    * (render-only: they never split geometry). `false` disables. Default on.
    */
   stubs?: { maxPerCrack?: number; atJunctions?: boolean } | false;
+
+  /**
+   * Corner relief: a short diagonal crack that lops the perfect 90-degree shard off each
+   * canvas corner (real panes never break to a clean right angle). Watertight - the chord
+   * is shared by the two pieces. Applies to title/radial/collapse; skipped for hero and for
+   * corners owned by 0 or 2 shards, the crush plug, or sub-pixel edges. `relief` 0..1 sizes
+   * the cut. 0 or `false` reproduces pre-corner-relief geometry. Default 0.55.
+   */
+  corners?: { relief?: number } | false;
+
+  /**
+   * mode 'hero': free-floating standalone shards (no pane partition, no cracks).
+   * Every edge of a hero shard is a fully jagged fracture face - built for close-up
+   * scenes where a single shard levitates over content.
+   */
+  hero?: {
+    /** Number of floating shards (1..3). Default 1. */
+    count?: number;
+    /** Shard radius as a fraction of min(width, height). Default 0.34. */
+    sizeFrac?: number;
+    /** 0..1 distance between shards when count > 1 (0 = touching). Default 0.5. */
+    spread?: number;
+    /** 0..1 pulls shards together until they visibly overlap (z-stack). Default 0. */
+    overlap?: number;
+  };
 }
 
 /** One crack polyline. Shared by the two adjacent shards -> watertight by construction. */
@@ -157,7 +182,7 @@ export interface MicroShardSeed {
 }
 
 export interface FracturePattern {
-  version: 4;
+  version: 5;
   mode: FractureMode;
   width: number;
   height: number;
@@ -180,6 +205,8 @@ export interface QualitySettings {
   smearGhosts: 0 | 1 | 2 | 3;
   /** Per-shard edge bevel highlight layer. */
   bevel: boolean;
+  /** Edge refraction ring (one extra content clone per shard when enabled). */
+  edgeDistortion: boolean;
   /** Spectral dispersion flares (1-2 blended gradient layers). */
   spectrum: boolean;
   /** Cap on rendered dead-end hairline cracks (stable prefix of the stub list). */
@@ -215,6 +242,21 @@ export interface TimelineParams {
 export interface EffectParams {
   quality: QualityPreset | QualitySettings;
   timeline: TimelineParams;
+  /**
+   * What the fracture breaks:
+   * - 'content': the content itself shatters; each piece carries its image away (v0.4).
+   * - 'glass':   a glass pane lies OVER the content; shards are moving lenses - the
+   *   content stays anchored to the pane and is seen REFRACTED through each flying
+   *   silhouette. The component renders one unclipped base content layer underneath,
+   *   so vanished shards (punch/drop/fadeOut) reveal the undistorted content.
+   *   Notes: rigid 3D tumble is disabled in this medium (a clipped wrapper flattens
+   *   transforms, making exact compensation impossible); whole-shard motion ghosts are
+   *   off; content motion blur is expressed via speed-scaled blur only. Glass cannot
+   *   reveal a second screen - use 'content' for screen transitions.
+   *   Scope: each lens refracts only the underlying content; shards never see each
+   *   other (no neighbor reflections, no compounded refraction in overlaps).
+   */
+  medium: 'content' | 'glass';
   /** Per-shard refraction of the content inside the (stationary) shard shape. */
   refraction: {
     /** Max lateral content shift in px (per-shard magnitude/direction derived from shard hash). */
@@ -239,6 +281,12 @@ export interface EffectParams {
     lightAngleDeg: number;
     /** Opacity of the static grain overlay when quality.grain is on. */
     grainOpacity: number;
+    /**
+     * Keep facet highlights, chroma dispersion, the spectral flare and facet brightness
+     * tracking the GLOBAL light while a shard spins/flies (the bevel always does).
+     * false = v0.4 behavior: those layers rotate away with the shard (byte anchor).
+     */
+    trackLight: boolean;
   };
   /** Chromatic aberration / spectral split. */
   chroma: {
@@ -346,6 +394,13 @@ export interface EffectParams {
     /** Band width relative to the shard's own extent along the light axis. */
     bandWidth: number;
     blendMode: BlendMode;
+    /**
+     * 0..1: pull the flare to the shard rim (dispersion happens at the fractured faces,
+     * not across the body) and weight the selection toward SMALL shards. The band is
+     * clipped to a perimeter ring and centered on the light-facing rim. 0 = v0.3
+     * full-body band with alignment-only selection (byte anchor).
+     */
+    edgeOnly: number;
   };
   shatter: {
     /** Initial speed in px per unit of t. */
@@ -393,6 +448,33 @@ export interface EffectParams {
     amplitudePx: number;
     frequency: number;
   };
+  /**
+   * Edge refraction band: a ring along the shard perimeter where the content refracts
+   * noticeably harder than in the interior - the fractured faces act as prisms and
+   * visibly distort whatever sits behind the rim. strength 0 disables the layer (v0.4).
+   */
+  edgeDistortion: {
+    /** Ring width in px, measured inward from the shard outline. */
+    widthPx: number;
+    /** 0..1 how much harder the rim refracts vs the interior. 0 = off. */
+    strength: number;
+    /** Extra blur inside the ring, px (capped by quality.maxBlurPx). */
+    blurPx: number;
+  };
+  /**
+   * Levitation of free shards (mode 'hero' only; ignored elsewhere). Pure sinusoids of t -
+   * integer `cycles` loop seamlessly over t in [0, 1].
+   */
+  float: {
+    /** Vertical bob amplitude, px. */
+    bobPx: number;
+    /** Horizontal sway amplitude, px. */
+    swayPx: number;
+    /** In-plane rocking amplitude, deg. */
+    rotDeg: number;
+    /** Full bob cycles over t in [0, 1]. */
+    cycles: number;
+  };
 }
 
 export type DeepPartial<T> = {
@@ -437,6 +519,32 @@ export interface ShardFrame {
     angleDeg: number;
     center01: number;
     width01: number;
+    /** Present when spectrum.edgeOnly > 0: CSS `path("...")` ring clip (perimeter band). */
+    clipPath?: string;
+    /** Raw ring path d for the SVG tier (outer loop + reversed inner loop, nonzero fill). */
+    d?: string;
+  } | null;
+  /**
+   * Edge refraction ring: one extra content clone clipped to a perimeter ring. The ring
+   * path is the outer outline plus a REVERSED inner inset loop - the default nonzero
+   * fill rule punches the hole, so no evenodd support is required anywhere.
+   * null when edgeDistortion.strength is 0 or the quality tier disables it.
+   */
+  edge: {
+    /** CSS `path("...")` clip for the HTML tier. */
+    clipPath: string;
+    /** Raw ring path d for the SVG tier <clipPath>. */
+    d: string;
+    /** Amplified refraction transform of the ring content (CSS value). */
+    transform: string;
+    /** url()-free filter list for the ring clone. */
+    filter: string;
+    opacity: number;
+    /** Raw amplified-refraction numbers for the SVG tier. */
+    dx: number;
+    dy: number;
+    rot: number;
+    scale: number;
   } | null;
   /** Ghost-mode chroma clones ([] in shadow/none mode). */
   chroma: Array<{
@@ -466,6 +574,14 @@ export interface ShardFrame {
   raw: {
     rigid: { dx: number; dy: number; rotZ: number; rotX: number; rotY: number; scale: number };
     refraction: { dx: number; dy: number; rot: number; scale: number; tiltX: number; tiltY: number };
+    /**
+     * medium 'glass' only (null otherwise): the rigid components the inverse anchor was
+     * built from, PRE-ROUNDED to the same precision as the wrapper string so the
+     * wrapper/inverse pair cancels to the browser's own arithmetic. The SVG tier
+     * composes: translate(cx cy) scale(1/scale) translate(-cx -cy) rotate(-rot cx cy)
+     * [refraction] translate(-dx -dy).
+     */
+    glass: { dx: number; dy: number; rot: number; scale: number } | null;
     brightness: number;
     contrast: number;
     blurPx: number;

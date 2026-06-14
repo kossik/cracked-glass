@@ -114,11 +114,18 @@ function selectSpectral(
   }
   if (candidates.length === 0) candidates = pattern.shards.map((_, i) => i);
 
-  candidates.sort((a, b) => {
-    const sa = Math.cos(poses[a].tiltAxis - lightRad);
-    const sb = Math.cos(poses[b].tiltAxis - lightRad);
-    return sb - sa || a - b;
-  });
+  // edgeOnly weights the pick toward SMALL shards (dispersion reads on slivers, not slabs);
+  // at 0 this is the verbatim alignment-only v0.3 ordering (byte anchor).
+  const edgeOnly = clamp(fx.spectrum.edgeOnly, 0, 1);
+  let maxArea = 1;
+  if (edgeOnly > 0) {
+    for (const i of candidates) maxArea = Math.max(maxArea, pattern.shards[i].area);
+  }
+  const score = (i: number): number => {
+    const align = Math.cos(poses[i].tiltAxis - lightRad);
+    return edgeOnly > 0 ? align + 1.2 * edgeOnly * (1 - pattern.shards[i].area / maxArea) : align;
+  };
+  candidates.sort((a, b) => score(b) - score(a) || a - b);
 
   const picked = candidates.slice(0, Math.min(fx.spectrum.count, candidates.length));
   for (const i of picked) {
@@ -133,9 +140,15 @@ function selectSpectral(
       if (pr < eMin) eMin = pr;
       if (pr > eMax) eMax = pr;
     }
+    const extent01 = (eMax - eMin) / span;
+    const baseCenter = clamp(centroidT + (rng() - 0.5) * 0.12, 0.05, 0.95);
+    const baseWidth = clamp(extent01 * fx.spectrum.bandWidth, 0.02, 0.5);
+    // edgeOnly slides the band onto the light-facing rim (max projection side) and
+    // narrows it - the rainbow hugs the fractured face instead of washing the body.
+    const rimCenter = clamp((eMax - tMin) / span - baseWidth * 0.3, 0.05, 0.95);
     out[i] = {
-      center01: clamp(centroidT + (rng() - 0.5) * 0.12, 0.05, 0.95),
-      width01: clamp(((eMax - eMin) / span) * fx.spectrum.bandWidth, 0.02, 0.5),
+      center01: baseCenter + (rimCenter - baseCenter) * edgeOnly,
+      width01: baseWidth * (1 - 0.55 * edgeOnly),
     };
   }
   return out;

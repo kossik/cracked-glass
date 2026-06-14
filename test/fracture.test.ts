@@ -152,7 +152,8 @@ describe('collapse fracture invariants', () => {
 
   it('has mesh cracks and bottom-up ringIndex rows', () => {
     const p = generateFracture({ mode: 'collapse', width: 960, height: 540, seed: 7 });
-    expect(p.cracks.every((c) => c.kind === 'mesh' || c.kind === 'stub')).toBe(true);
+    // 'split' = corner-relief chords (default on); 'stub' = hairlines
+    expect(p.cracks.every((c) => c.kind === 'mesh' || c.kind === 'stub' || c.kind === 'split')).toBe(true);
     expect(p.cracks.filter((c) => c.kind === 'mesh').length).toBeGreaterThan(3);
     const rows = p.shards.map((s) => s.ringIndex);
     expect(Math.min(...rows)).toBe(0);

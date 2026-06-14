@@ -3,6 +3,8 @@ import { resolveFractureOptions } from './build';
 import { generateTitleFracture } from './title';
 import { generateRadialFracture } from './radial';
 import { generateCollapseFracture } from './collapse';
+import { generateHeroFracture } from './hero';
+import { applyCornerRelief } from './corners';
 import { addStubCracks, type StubJunction } from './stubs';
 import { seedMicroShards } from './micro';
 
@@ -27,6 +29,13 @@ export function generateFracture(opts: FractureOptions): FracturePattern {
     stubScale = res.stubScale;
     const bandH = o.height / Math.max(1, Math.max(...shards.map((s) => s.ringIndex)) + 1);
     ringIndexAt = (origin) => Math.max(0, Math.min(Math.floor(origin[1] / bandH), 64));
+  } else if (o.mode === 'hero') {
+    const res = generateHeroFracture(o);
+    shards = res.shards;
+    cracks = res.cracks;
+    junctions = res.junctions;
+    stubScale = res.stubScale;
+    ringIndexAt = () => 0;
   } else if (o.mode === 'collapse') {
     const res = generateCollapseFracture(o);
     shards = res.shards;
@@ -50,6 +59,10 @@ export function generateFracture(opts: FractureOptions): FracturePattern {
     };
   }
 
+  // Corner relief: split the perfect 90-degree corner shards (watertight ear-cut, owner
+  // kept in place + ear appended so no other shard is renumbered). Before stubs/micro.
+  applyCornerRelief(o, shards, cracks);
+
   // Dead-end hairlines: appended AFTER all main cracks (render streams stay prefix-stable);
   // micro seeding below filters them, so shards/micro are byte-identical with stubs off.
   addStubCracks(o, cracks, junctions, stubScale);
@@ -57,7 +70,7 @@ export function generateFracture(opts: FractureOptions): FracturePattern {
   const micro = seedMicroShards(o, cracks, ringIndexAt);
 
   const pattern: FracturePattern = {
-    version: 4,
+    version: 5,
     mode: o.mode,
     width: o.width,
     height: o.height,

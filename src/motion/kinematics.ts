@@ -53,6 +53,7 @@ export function assignOutliers(pattern: FracturePattern, outliers: EffectParams[
   }
   if (
     !hasException &&
+    pattern.mode !== 'hero' && // free-floating heroes get no forced exception
     pattern.shards.length <= 12 &&
     outliers.slipFraction + outliers.rebelFraction > 0
   ) {

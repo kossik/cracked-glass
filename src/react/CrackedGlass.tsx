@@ -48,12 +48,22 @@ export function CrackedGlass(props: CrackedGlassProps): ReactNode {
   const content = (i: number): ReactNode => (renderContent ? renderContent(i) : children);
 
   const fill: CSSProperties = { position: 'absolute', inset: 0 };
+  const glass = fxFull.medium === 'glass';
 
   return (
     <div
       className={className}
       style={{ position: 'relative', width: w, height: h, isolation: 'isolate', ...style }}
     >
+      {glass && (
+        // Glass medium is self-contained: the unbroken content lies under the pane, so
+        // vanished shards (punch/drop/fadeOut) reveal it undistorted. This is also the
+        // accessible, interactive copy - every per-shard clone is aria-hidden and
+        // pointer-transparent, so focus/clicks land here. zIndex 0 makes this a stacking
+        // context pinned UNDER the shards (z >= 10), so positioned user content inside
+        // can't escape above the effect.
+        <div style={{ ...fill, zIndex: 0, isolation: 'isolate' }}>{content(0)}</div>
+      )}
       {frame.shards.map((s, i) => (
         <div key={s.id} style={{ display: 'contents' }}>
           {s.ghosts.map((g, k) => (
@@ -76,7 +86,7 @@ export function CrackedGlass(props: CrackedGlassProps): ReactNode {
             </div>
           ))}
           <div
-            aria-hidden={i > 0 || undefined}
+            aria-hidden={glass || i > 0 || undefined}
             style={{
               ...fill,
               clipPath: s.clipPath,
@@ -85,6 +95,9 @@ export function CrackedGlass(props: CrackedGlassProps): ReactNode {
               opacity: s.opacity,
               zIndex: s.zIndex,
               isolation: 'isolate',
+              // glass: the lens clones are decorative; clicks/selection fall through to
+              // the interactive base layer (which sits at the same pane coordinates).
+              ...(glass ? { pointerEvents: 'none' as const } : null),
             }}
           >
             {s.smear.map((sm, k) => (
@@ -103,34 +116,104 @@ export function CrackedGlass(props: CrackedGlassProps): ReactNode {
                 {content(i)}
               </div>
             ))}
-            <div
-              style={{
-                ...fill,
-                transform: s.contentTransform,
-                transformOrigin: s.transformOrigin,
-                filter: s.contentFilter || undefined,
-              }}
-            >
-              {content(i)}
-            </div>
-            {s.chroma.map((c, k) => (
+            {glass ? (
+              // Glass medium: the filter is hoisted onto a NO-transform div so it applies
+              // in wrapper-local space (same space as the SVG tier's filter region), and
+              // the inverse-anchoring transform lives on the child.
+              <div style={{ ...fill, filter: s.contentFilter || undefined }}>
+                <div style={{ ...fill, transform: s.contentTransform, transformOrigin: s.transformOrigin }}>
+                  {content(i)}
+                </div>
+              </div>
+            ) : (
               <div
-                key={`c${k}`}
-                aria-hidden
                 style={{
                   ...fill,
-                  clipPath: s.innerClipPath,
-                  transform: c.transform,
+                  transform: s.contentTransform,
                   transformOrigin: s.transformOrigin,
-                  filter: c.filter || undefined,
-                  mixBlendMode: c.mixBlendMode,
-                  opacity: c.opacity,
-                  pointerEvents: 'none',
+                  filter: s.contentFilter || undefined,
                 }}
               >
                 {content(i)}
               </div>
-            ))}
+            )}
+            {s.edge &&
+              // Edge refraction ring: an extra clone clipped to the perimeter band, refracted
+              // harder than the interior (the fractured faces act as prisms).
+              (glass ? (
+                // Glass: clip + filter stay on an untransformed carrier (they ride the flying
+                // wrapper); the inverse-anchoring transform goes on the child. Putting the
+                // inverse on the clipped element itself would drag the clip window back to
+                // pane coordinates and blank the ring mid-flight.
+                <div
+                  aria-hidden
+                  style={{
+                    ...fill,
+                    clipPath: s.edge.clipPath,
+                    filter: s.edge.filter || undefined,
+                    opacity: s.edge.opacity,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <div style={{ ...fill, transform: s.edge.transform, transformOrigin: s.transformOrigin }}>
+                    {content(i)}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  aria-hidden
+                  style={{
+                    ...fill,
+                    clipPath: s.edge.clipPath,
+                    transform: s.edge.transform,
+                    transformOrigin: s.transformOrigin,
+                    filter: s.edge.filter || undefined,
+                    opacity: s.edge.opacity,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {content(i)}
+                </div>
+              ))}
+            {s.chroma.map((c, k) =>
+              glass ? (
+                // Glass: same carrier/child split as the edge ring (clip must fly with the
+                // wrapper while the content inside is counter-anchored to the pane).
+                <div
+                  key={`c${k}`}
+                  aria-hidden
+                  style={{
+                    ...fill,
+                    clipPath: s.innerClipPath,
+                    filter: c.filter || undefined,
+                    mixBlendMode: c.mixBlendMode,
+                    opacity: c.opacity,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <div style={{ ...fill, transform: c.transform, transformOrigin: s.transformOrigin }}>
+                    {content(i)}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  key={`c${k}`}
+                  aria-hidden
+                  style={{
+                    ...fill,
+                    clipPath: s.innerClipPath,
+                    transform: c.transform,
+                    transformOrigin: s.transformOrigin,
+                    filter: c.filter || undefined,
+                    mixBlendMode: c.mixBlendMode,
+                    opacity: c.opacity,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {content(i)}
+                </div>
+              ),
+            )}
             {s.facet && (
               <div
                 aria-hidden
@@ -149,7 +232,9 @@ export function CrackedGlass(props: CrackedGlassProps): ReactNode {
                 aria-hidden
                 style={{
                   ...fill,
-                  clipPath: s.innerClipPath,
+                  // edgeOnly mode clips the flare to the perimeter ring (dispersion lives
+                  // at the fractured faces); otherwise the full shard body as before.
+                  clipPath: s.spectrum.clipPath ?? s.innerClipPath,
                   background: s.spectrum.background,
                   mixBlendMode: s.spectrum.mixBlendMode,
                   opacity: s.spectrum.opacity,

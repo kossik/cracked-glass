@@ -1,11 +1,21 @@
-/** Snapshot a curated set of (scene, t) pairs for visual review. */
-import { mkdirSync, writeFileSync } from 'node:fs';
+/**
+ * Snapshot a curated set of (scene, t) pairs for visual review.
+ *
+ * Two modes:
+ *   node tools/showcase.mjs                       - built-in demo shot list
+ *   node tools/showcase.mjs --shots <file.json>   - lab shot list exported from /lab.html
+ *     (array of { name, s, t }: `s` is the packed lab state from the "export shots" button)
+ */
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const outDir = join(here, 'output', 'showcase');
 mkdirSync(outDir, { recursive: true });
+
+const shotsArg = process.argv.indexOf('--shots');
+const labShots = shotsArg >= 0 ? JSON.parse(readFileSync(process.argv[shotsArg + 1], 'utf8')) : null;
 
 const SHOTS = [
   ['title-anim', 0.22],
@@ -52,23 +62,43 @@ for (const opt of [{ channel: 'msedge' }, { channel: 'chrome' }, {}]) {
 }
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, deviceScaleFactor: 1 });
 
-let currentScene = null;
-for (const [scene, t] of SHOTS) {
-  if (scene !== currentScene) {
-    await page.goto(`${base}/?scene=${scene}&seed=7&capture=1&t=0`, { waitUntil: 'networkidle' });
-    await page.waitForSelector('[data-stage]');
-    await page.evaluate(() => document.fonts.ready);
-    await page.waitForTimeout(350);
-    currentScene = scene;
-  }
+const settle = async (url) => {
+  await page.goto(url, { waitUntil: 'networkidle' });
+  await page.waitForSelector('[data-stage]');
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(350);
+};
+
+const snapTo = async (t, name) => {
   await page.evaluate(
     (v) => new Promise((res) => { window.__cgSetT(v); requestAnimationFrame(() => requestAnimationFrame(res)); }),
     t,
   );
   const buf = await page.locator('[data-stage]').screenshot({ animations: 'disabled' });
-  const name = `${scene}-${String(t).replace('.', '')}.png`;
   writeFileSync(join(outDir, name), buf);
   console.log(`saved ${name}`);
+};
+
+if (labShots) {
+  // Lab shot list: each entry pins the full lab state via the packed `s` URL param.
+  let currentS = null;
+  for (const shot of labShots) {
+    if (shot.s !== currentS) {
+      await settle(`${base}/lab.html?s=${shot.s}&capture=1&t=0`);
+      currentS = shot.s;
+    }
+    const safe = String(shot.name ?? `shot-${shot.t}`).replace(/[^a-z0-9_-]+/gi, '_');
+    await snapTo(shot.t, `${safe}.png`);
+  }
+} else {
+  let currentScene = null;
+  for (const [scene, t] of SHOTS) {
+    if (scene !== currentScene) {
+      await settle(`${base}/?scene=${scene}&seed=7&capture=1&t=0`);
+      currentScene = scene;
+    }
+    await snapTo(t, `${scene}-${String(t).replace('.', '')}.png`);
+  }
 }
 
 await browser.close();

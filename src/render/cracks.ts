@@ -155,7 +155,18 @@ export function crackLayer(
     }
   }
 
-  const opacity = info.phase === 'shattering' ? clamp01(1 - info.shatterTau / 0.07) : 1;
+  // The crack web fades as shards depart. In glass mode the stationary content is seamless
+  // with the base layer, so a fixed 0.07 window lets the pane look fully HEALED while
+  // staggered outer rings are still in place; stretch the window across the stagger
+  // envelope so the cracks linger until the pieces they border actually leave. Content
+  // mode keeps the verbatim v0.4 constant (byte anchor).
+  let fadeWindow = 0.07;
+  if (fx.medium === 'glass') {
+    let maxRing = 0;
+    for (const s of pattern.shards) if (s.ringIndex > maxRing) maxRing = s.ringIndex;
+    fadeWindow = maxRing * fx.shatter.staggerPerRing * 1.4 + 0.07;
+  }
+  const opacity = info.phase === 'shattering' ? clamp01(1 - info.shatterTau / fadeWindow) : 1;
 
   let sparkle: FrameData['cracks']['sparkle'] = null;
   if (style.sparkle && pattern.mode === 'radial') {

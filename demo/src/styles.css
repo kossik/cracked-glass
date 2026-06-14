@@ -40,6 +40,19 @@ body,
   color: #5ad1ff;
 }
 
+.cross-link {
+  display: inline-block;
+  font-size: 11px;
+  color: #5ad1ff;
+  text-decoration: none;
+  letter-spacing: 0.03em;
+  margin: -4px 0 2px;
+}
+
+.cross-link:hover {
+  text-decoration: underline;
+}
+
 .field {
   display: flex;
   flex-direction: column;

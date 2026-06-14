@@ -123,6 +123,15 @@ export function CrackedGlassText(props: CrackedGlassTextProps): ReactNode {
             <path d={geo.clipD[i]} />
           </clipPath>
         ))}
+        {frame.shards.map(
+          (sf, i) =>
+            sf.edge && (
+              // Perimeter ring (outer loop + reversed inner loop, nonzero fill = hole).
+              <clipPath key={sf.id} id={`${iid}-ring${i}`} clipPathUnits="userSpaceOnUse">
+                <path d={sf.edge.d} />
+              </clipPath>
+            ),
+        )}
         {pattern.shards.map((s, i) => {
           const r = frame.shards[i].raw;
           const b = geo.bbox[i];
@@ -194,16 +203,47 @@ export function CrackedGlassText(props: CrackedGlassTextProps): ReactNode {
         })}
         {pattern.shards.map((s, i) => {
           const r = frame.shards[i].raw;
+          const stops = (
+            <>
+              <stop offset="0%" stopColor={`rgba(255,255,255,${fmt(r.facetWhite, 3)})`} />
+              <stop offset="38%" stopColor="rgba(255,255,255,0)" />
+              <stop offset="62%" stopColor="rgba(0,0,0,0)" />
+              <stop offset="100%" stopColor={`rgba(0,0,0,${fmt(r.facetBlack, 3)})`} />
+            </>
+          );
+          if (fxFull.optics.trackLight) {
+            // trackLight animates the facet angle per frame: the objectBoundingBox
+            // gradientTransform would skew the angle on non-square shards (the spectrum
+            // gradient avoided this the same way), so compute userSpaceOnUse endpoints
+            // along the CSS-convention gradient axis across the shard bbox.
+            const b = geo.bbox[i];
+            const aRad = (r.facetAngleDeg * Math.PI) / 180;
+            const dirX = Math.sin(aRad);
+            const dirY = -Math.cos(aRad);
+            const cx2 = (b.x0 + b.x1) / 2;
+            const cy2 = (b.y0 + b.y1) / 2;
+            const half = (Math.abs((b.x1 - b.x0) * dirX) + Math.abs((b.y1 - b.y0) * dirY)) / 2;
+            return (
+              <linearGradient
+                key={s.id}
+                id={`${iid}-facet${i}`}
+                gradientUnits="userSpaceOnUse"
+                x1={fmt(cx2 - dirX * half)}
+                y1={fmt(cy2 - dirY * half)}
+                x2={fmt(cx2 + dirX * half)}
+                y2={fmt(cy2 + dirY * half)}
+              >
+                {stops}
+              </linearGradient>
+            );
+          }
           return (
             <linearGradient
               key={s.id}
               id={`${iid}-facet${i}`}
               gradientTransform={`rotate(${fmt(r.facetAngleDeg, 1)} 0.5 0.5)`}
             >
-              <stop offset="0%" stopColor={`rgba(255,255,255,${fmt(r.facetWhite, 3)})`} />
-              <stop offset="38%" stopColor="rgba(255,255,255,0)" />
-              <stop offset="62%" stopColor="rgba(0,0,0,0)" />
-              <stop offset="100%" stopColor={`rgba(0,0,0,${fmt(r.facetBlack, 3)})`} />
+              {stops}
             </linearGradient>
           );
         })}
@@ -274,6 +314,9 @@ export function CrackedGlassText(props: CrackedGlassTextProps): ReactNode {
         )}
       </defs>
 
+      {/* glass medium: the unbroken content under the pane (also the accessible copy) */}
+      {fxFull.medium === 'glass' && <use href={`#${iid}-content`} />}
+
       {/* shards (fixed z-order from the pattern) */}
       {frame.shards
         .map((sf, i) => ({ sf, i, z: sf.zIndex }))
@@ -281,10 +324,21 @@ export function CrackedGlassText(props: CrackedGlassTextProps): ReactNode {
         .map(({ sf, i }) => {
           const s = pattern.shards[i];
           const [cx, cy] = s.centroid;
-          // rigid scale included (punched plug shrink) - keeps the SVG tier in lockstep with HTML
-          const rigid = `translate(${fmt(sf.raw.rigid.dx)} ${fmt(sf.raw.rigid.dy)}) rotate(${fmt(sf.raw.rigid.rotZ, 3)} ${fmt(cx)} ${fmt(cy)}) translate(${fmt(cx)} ${fmt(cy)}) scale(${fmt(sf.raw.rigid.scale, 4)}) translate(${fmt(-cx)} ${fmt(-cy)})`;
+          const gl = sf.raw.glass;
+          // rigid scale included (punched plug shrink) - keeps the SVG tier in lockstep with HTML.
+          // Glass medium: built from the SAME pre-rounded components as the inverse below,
+          // so the wrapper/inverse pair cancels exactly.
+          const rigid = gl
+            ? `translate(${fmt(gl.dx)} ${fmt(gl.dy)}) rotate(${fmt(gl.rot, 3)} ${fmt(cx)} ${fmt(cy)}) translate(${fmt(cx)} ${fmt(cy)}) scale(${fmt(gl.scale, 4)}) translate(${fmt(-cx)} ${fmt(-cy)})`
+            : `translate(${fmt(sf.raw.rigid.dx)} ${fmt(sf.raw.rigid.dy)}) rotate(${fmt(sf.raw.rigid.rotZ, 3)} ${fmt(cx)} ${fmt(cy)}) translate(${fmt(cx)} ${fmt(cy)}) scale(${fmt(sf.raw.rigid.scale, 4)}) translate(${fmt(-cx)} ${fmt(-cy)})`;
           const rf = sf.raw.refraction;
-          const refr = `translate(${fmt(rf.dx)} ${fmt(rf.dy)}) rotate(${fmt(rf.rot, 3)} ${fmt(cx)} ${fmt(cy)}) translate(${fmt(cx)} ${fmt(cy)}) scale(${fmt(rf.scale, 4)}) translate(${fmt(-cx)} ${fmt(-cy)})`;
+          const refrCore = `translate(${fmt(rf.dx)} ${fmt(rf.dy)}) rotate(${fmt(rf.rot, 3)} ${fmt(cx)} ${fmt(cy)}) translate(${fmt(cx)} ${fmt(cy)}) scale(${fmt(rf.scale, 4)}) translate(${fmt(-cx)} ${fmt(-cy)})`;
+          // Glass: inv(T_rigid) * refraction * translate(-flight) - the fully-reversed
+          // per-sandwich inverse (a naive negated-parameter mirror is wrong by design
+          // review); the trailing translate re-anchors refraction at the FLOWN centroid.
+          const refr = gl
+            ? `translate(${fmt(cx)} ${fmt(cy)}) scale(${fmt(1 / gl.scale, 6)}) translate(${fmt(-cx)} ${fmt(-cy)}) rotate(${fmt(-gl.rot, 3)} ${fmt(cx)} ${fmt(cy)}) ${refrCore} translate(${fmt(-gl.dx)} ${fmt(-gl.dy)})`
+            : refrCore;
           return (
             <g
               key={sf.id}
@@ -307,6 +361,23 @@ export function CrackedGlassText(props: CrackedGlassTextProps): ReactNode {
                   <use href={`#${iid}-content`} />
                 </g>
               </g>
+              {sf.edge &&
+                (() => {
+                  // Edge refraction ring: same content, refracted harder, clipped to the rim.
+                  const edgeCore = `translate(${fmt(sf.edge.dx)} ${fmt(sf.edge.dy)}) rotate(${fmt(sf.edge.rot, 3)} ${fmt(cx)} ${fmt(cy)}) translate(${fmt(cx)} ${fmt(cy)}) scale(${fmt(sf.edge.scale, 4)}) translate(${fmt(-cx)} ${fmt(-cy)})`;
+                  const edgeT = gl
+                    ? `translate(${fmt(cx)} ${fmt(cy)}) scale(${fmt(1 / gl.scale, 6)}) translate(${fmt(-cx)} ${fmt(-cy)}) rotate(${fmt(-gl.rot, 3)} ${fmt(cx)} ${fmt(cy)}) ${edgeCore} translate(${fmt(-gl.dx)} ${fmt(-gl.dy)})`
+                    : edgeCore;
+                  return (
+                    <g clipPath={`url(#${iid}-ring${i})`} opacity={sf.edge.opacity}>
+                      <g filter={`url(#${iid}-f${i})`}>
+                        <g transform={edgeT}>
+                          <use href={`#${iid}-content`} />
+                        </g>
+                      </g>
+                    </g>
+                  );
+                })()}
               {sf.facet && (
                 <path
                   d={geo.clipD[i]}
@@ -317,7 +388,8 @@ export function CrackedGlassText(props: CrackedGlassTextProps): ReactNode {
               )}
               {sf.spectrum && (
                 <path
-                  d={geo.clipD[i]}
+                  // edgeOnly mode: the keyhole ring path (nonzero fill paints only the rim band)
+                  d={sf.spectrum.d ?? geo.clipD[i]}
                   fill={`url(#${iid}-spec${i})`}
                   style={{ mixBlendMode: sf.spectrum.mixBlendMode as CSSProperties['mixBlendMode'] }}
                   opacity={sf.spectrum.opacity}

@@ -13,7 +13,7 @@ import { clamp } from '../core/math';
 
 /** Fully-resolved generation options (internal). */
 export interface ResolvedFracture {
-  mode: 'title' | 'radial' | 'collapse';
+  mode: 'title' | 'radial' | 'collapse' | 'hero';
   width: number;
   height: number;
   seed: number;
@@ -44,6 +44,8 @@ export interface ResolvedFracture {
     waviness: number;
     merge: number;
   };
+  hero: { count: number; sizeFrac: number; spread: number; overlap: number };
+  corners: { relief: number } | false;
 }
 
 export function resolveFractureOptions(opts: FractureOptions): ResolvedFracture {
@@ -52,7 +54,8 @@ export function resolveFractureOptions(opts: FractureOptions): ResolvedFracture 
   if (!Number.isFinite(opts.seed)) throw new Error('cracked-glass: seed must be a finite number');
   const seed = opts.seed >>> 0;
   const micro = opts.micro;
-  const defaultMicroCount = opts.mode === 'radial' ? 110 : opts.mode === 'collapse' ? 90 : 36;
+  const defaultMicroCount =
+    opts.mode === 'radial' ? 110 : opts.mode === 'collapse' ? 90 : opts.mode === 'hero' ? 0 : 36;
   // Family directions must stay transversal: the single-intersection guarantee needs >= 35 deg.
   const angleA = opts.collapse?.angleA ?? 14;
   let angleB = opts.collapse?.angleB ?? 76;
@@ -109,6 +112,14 @@ export function resolveFractureOptions(opts: FractureOptions): ResolvedFracture 
       waviness: clamp(opts.collapse?.waviness ?? 0.5, 0, 1),
       merge: clamp(opts.collapse?.merge ?? 0.3, 0, 1),
     },
+    hero: {
+      count: clamp(Math.round(opts.hero?.count ?? 1), 1, 3),
+      sizeFrac: clamp(opts.hero?.sizeFrac ?? 0.34, 0.05, 0.48),
+      spread: clamp(opts.hero?.spread ?? 0.5, 0, 1),
+      overlap: clamp(opts.hero?.overlap ?? 0, 0, 1),
+    },
+    corners:
+      opts.corners === false ? false : { relief: clamp(opts.corners?.relief ?? 0.55, 0, 1) },
   };
 }
 

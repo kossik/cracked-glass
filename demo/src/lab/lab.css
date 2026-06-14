@@ -1,0 +1,282 @@
+/* Lab-specific UI on top of the shared demo styles. */
+
+.lab-sidebar {
+  width: 330px;
+  flex: 0 0 330px;
+  gap: 10px;
+}
+
+/* --- folders --- */
+
+.folder {
+  border: 1px solid #1d2230;
+  border-radius: 8px;
+  background: #0d1018;
+}
+
+.folder-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 2px;
+}
+
+.folder-title {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 7px 8px;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  color: #aeb9cf;
+}
+
+.folder-title:hover {
+  background: none;
+  color: #e8edf7;
+}
+
+.folder-title .chev {
+  color: #5ad1ff;
+  margin-right: 2px;
+}
+
+.folder .badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: #1f4fd8;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+button.icon {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  font-size: 11px;
+  background: none;
+  border: none;
+  opacity: 0.7;
+}
+
+button.icon:hover {
+  opacity: 1;
+  background: #1a2030;
+}
+
+button.icon.active {
+  opacity: 1;
+  color: #ffc163;
+}
+
+button.active {
+  border-color: #5ad1ff;
+  color: #5ad1ff;
+}
+
+.folder-body {
+  padding: 4px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* --- param rows --- */
+
+.prow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.prow label {
+  flex: 0 0 92px;
+  font-size: 11px;
+  color: #8a93a6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prow.dirty label {
+  color: #5ad1ff;
+}
+
+.prow input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: #5ad1ff;
+  height: 18px;
+}
+
+.prow input.num {
+  flex: 0 0 58px;
+  background: #0b0d12;
+  color: #d7dce6;
+  border: 1px solid #262c3d;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+.prow select {
+  flex: 1;
+  background: #0b0d12;
+  color: #d7dce6;
+  border: 1px solid #262c3d;
+  border-radius: 4px;
+  padding: 3px 4px;
+  font-size: 11px;
+}
+
+.prow .val {
+  flex: 0 0 36px;
+  font-size: 11px;
+  color: #5ad1ff;
+  text-align: right;
+}
+
+.reset-dot {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  color: #5ad1ff;
+  font-size: 9px;
+  padding: 2px;
+}
+
+/* --- stage / compare --- */
+
+.stage-wrap {
+  gap: 18px;
+}
+
+.stage-wrap.compare {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stage-cell {
+  position: relative;
+  flex: 0 1 auto;
+}
+
+.stage-wrap.compare .stage {
+  /* fit two 960px stages side by side */
+  zoom: 0.62;
+}
+
+.stage-tag {
+  position: absolute;
+  top: -22px;
+  left: 2px;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #8a93a6;
+  z-index: 5;
+}
+
+.stage-tag.live {
+  color: #5ad1ff;
+}
+
+/* --- playback bar --- */
+
+.tbar .play {
+  flex: 0 0 44px;
+}
+
+.playopts {
+  font-size: 11px;
+  color: #8a93a6;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.playopts label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.playopts input[type='number'] {
+  width: 52px;
+  background: #0b0d12;
+  color: #d7dce6;
+  border: 1px solid #262c3d;
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+.playopts select {
+  background: #0b0d12;
+  color: #d7dce6;
+  border: 1px solid #262c3d;
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+.playopts .spacer {
+  flex: 1;
+}
+
+.playopts button {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+/* --- hero scene underlay --- */
+
+.hero-under {
+  position: absolute;
+  inset: 0;
+  padding: 56px 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background:
+    radial-gradient(900px 420px at 24% 0%, rgba(90, 209, 255, 0.14), transparent),
+    radial-gradient(700px 420px at 90% 100%, rgba(255, 64, 129, 0.1), transparent),
+    linear-gradient(165deg, #131827 0%, #0c0f16 100%);
+}
+
+.hero-under .kicker {
+  font-size: 12px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #6f7d96;
+}
+
+.hero-word {
+  font-size: 110px;
+  font-weight: 900;
+  line-height: 0.92;
+  letter-spacing: 0.01em;
+  margin: 0;
+  color: #f4f7ff;
+}
+
+.hero-body {
+  max-width: 640px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: #93a0b8;
+  margin: 0;
+}
+
+/* Fine ruled lines: refraction and edge distortion read instantly on them. */
+.hero-rules {
+  flex: 1;
+  margin-top: 6px;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(150, 170, 205, 0.16) 0 1px,
+    transparent 1px 14px
+  );
+}
